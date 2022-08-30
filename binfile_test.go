@@ -27,7 +27,7 @@ type TestBinaryStructure1 struct {
 func TestUnmarshalBinary1(t *testing.T) {
 	data := "D 03116506 044760722905768    E61     6.40  62      935  "
 	var r TestBinaryStructure1
-	err := Unmarshal([]byte(data), r, CR)
+	err := Unmarshal([]byte(data), &r, CR)
 	assert.Equal(t, nil, err)
 	assert.Equal(t, "D ", r.RecordType)
 	assert.Equal(t, 3, r.UnitNo)
@@ -57,6 +57,6 @@ func TestUnmarshalBinary2(t *testing.T) {
 	data := "D 03116506 044760722905768    E61     6.40  62      935  \u000DD 03116507 044860722905758    E61     6.86  62      883  "
 
 	var r TestBinaryStructure2
-	err := Unmarshal([]byte(data), r, CR)
+	err := Unmarshal([]byte(data), &r, CR)
 	assert.Equal(t, nil, err)
 }

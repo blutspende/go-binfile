@@ -71,17 +71,8 @@ func reflectInputToStruct(bufferedInputLines []string, depth int, currentInputLi
 
 	for i := 0; i < targetStructType.NumField(); i++ {
 		currentRecord := targetStructValue.Field(i)
-		ftype := targetStructType.Field(i)
-		binTag := ftype.Tag.Get("bin")
-		binTagList := strings.Split(binTag, ",")
+		// ftype := targetStructType.Field(i)
 
-		if len(binTagList) < 1 {
-			continue // not annotated = no processing
-		}
-
-		if binTagList[0] != "" {
-
-		}
 		if targetStructType.Field(i).Type.Kind() == reflect.Slice {
 			// Array of Structs
 			if reflect.TypeOf(targetStructValue.Interface()).Kind() == reflect.Struct {
@@ -130,50 +121,32 @@ func reflectInputToStruct(bufferedInputLines []string, depth int, currentInputLi
 				return currentInputLine, ERROR, errors.New(fmt.Sprintf("Invalid Datatype '%s' - abort unmarshal.", targetStructType.Field(i).Type.Kind()))
 			}
 		}
-		expectInputRecordType := binTagList[0] // Expected Record type
-		trimInputRecord := false
-		if sliceContainsString(binTagList, ANNOTATION_TRIM) {
-			trimInputRecord = true
-		}
 
-		if len(bufferedInputLines[currentInputLine]) == 0 {
-			continue // empty lines can only be skipped
-		}
+		if currentRecord.Kind() == reflect.Slice {
+			innerStructureType := targetStructType.Field(i).Type.Elem()
+			sliceForNestedStructure := reflect.MakeSlice(targetStructType.Field(i).Type, 0, 0)
+			for { // iterate for as long as the same type repeats
+				allocatedElement := reflect.New(innerStructureType)
 
-		//TODO: here are some bugs!!
-		if expectInputRecordType == bufferedInputLines[currentInputLine] {
-			if currentRecord.Kind() == reflect.Slice {
-				innerStructureType := targetStructType.Field(i).Type.Elem()
-				sliceForNestedStructure := reflect.MakeSlice(targetStructType.Field(i).Type, 0, 0)
-				for { // iterate for as long as the same type repeats
-					allocatedElement := reflect.New(innerStructureType)
-
-					if err := reflectAnnotatedFields(bufferedInputLines[currentInputLine], allocatedElement.Elem(), trimInputRecord); err != nil {
-						return currentInputLine, ERROR, errors.New(fmt.Sprintf("Failed to process input line '%s' err:%s", bufferedInputLines[currentInputLine], err))
-					}
-
-					sliceForNestedStructure = reflect.Append(sliceForNestedStructure, allocatedElement.Elem())
-					reflect.ValueOf(targetStruct).Elem().Field(i).Set(sliceForNestedStructure)
-
-					// keep reading while same elements are up
-					currentInputLine = currentInputLine + 1
-					if expectInputRecordType != bufferedInputLines[currentInputLine] {
-						break
-					}
-					if currentInputLine >= len(bufferedInputLines) {
-						break
-					}
-				}
-
-			} else { // The "normal" case: scanning a string into a structure :
-				if err := reflectAnnotatedFields(bufferedInputLines[currentInputLine], currentRecord, trimInputRecord); err != nil {
+				if err := reflectAnnotatedFields(bufferedInputLines[currentInputLine], allocatedElement.Elem(), 0); err != nil {
 					return currentInputLine, ERROR, errors.New(fmt.Sprintf("Failed to process input line '%s' err:%s", bufferedInputLines[currentInputLine], err))
 				}
+
+				sliceForNestedStructure = reflect.Append(sliceForNestedStructure, allocatedElement.Elem())
+				reflect.ValueOf(targetStruct).Elem().Field(i).Set(sliceForNestedStructure)
+
+				// keep reading while same elements are up
 				currentInputLine = currentInputLine + 1
+				if currentInputLine >= len(bufferedInputLines) {
+					break
+				}
 			}
 
-		} else { // The expected input-record did not occur
-			return currentInputLine, UNEXPECTED, errors.New(fmt.Sprintf("Expected Record-Type '%s' input was '%c' in depth (%d) (Abort)", expectInputRecordType, bufferedInputLines[currentInputLine][0], depth))
+		} else { // The "normal" case: scanning a string into a structure :
+			if err := reflectAnnotatedFields(bufferedInputLines[currentInputLine], targetStructValue, 0); err != nil {
+				return currentInputLine, ERROR, errors.New(fmt.Sprintf("Failed to process input line '%s' err:%s", bufferedInputLines[currentInputLine], err))
+			}
+			currentInputLine = currentInputLine + 1
 		}
 		if currentInputLine >= len(bufferedInputLines) {
 			break
@@ -210,13 +183,12 @@ func readFieldAddressAnnotation(annotation string) (absolute int, relativeLength
 	return
 }
 
-func reflectAnnotatedFields(inputStr string, record reflect.Value, trimRecord bool) error {
+func reflectAnnotatedFields(inputStr string, record reflect.Value, currentPosition int) error {
 
 	if reflect.ValueOf(record).Type().Kind() != reflect.Struct {
 		return errors.New(fmt.Sprintf("invalid type of target: '%s', expecting 'struct'", reflect.ValueOf(record).Type().Kind()))
 	}
 
-	currentPosition := 0
 	for j := 0; j < record.NumField(); j++ {
 		recordField := record.Field(j)
 		if !recordField.CanInterface() {
@@ -227,7 +199,7 @@ func reflectAnnotatedFields(inputStr string, record reflect.Value, trimRecord bo
 		hasTrimAnnotation := false
 		binTag := record.Type().Field(j).Tag.Get("bin")
 		if binTag == "" {
-			continue // nothing to process when someone requires astm:
+			return nil // nothing to process when someone requires bin:
 		}
 		binTagsList := strings.Split(binTag, ",")
 		for i := 0; i < len(binTagsList); i++ {
@@ -248,10 +220,12 @@ func reflectAnnotatedFields(inputStr string, record reflect.Value, trimRecord bo
 
 		if currentPosition >= len(inputStr) || currentPosition < 0 {
 			//TODO: user should be able to toggle wether he wants an exact match = error or bestfit = skip silent
-			continue // mapped field is beyond the data
+			return nil // mapped field is beyond the data
 		}
 
 		switch reflect.TypeOf(recordField.Interface()).Kind() {
+		case reflect.Array, reflect.Slice:
+			reflectAnnotatedFields(inputStr, recordField, currentPosition)
 		case reflect.String:
 			if absolutePos > 0 {
 				currentPosition = absolutePos
