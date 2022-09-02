@@ -2,7 +2,6 @@ package binfile
 
 import (
 	"fmt"
-	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -26,6 +25,8 @@ const (
 	ANNOTATION_TERMINATOR = "terminator"
 	ANNOTATION_ARRAY      = "array"
 )
+
+var errAbortArrayTerminator = fmt.Errorf("Aborting due to array-terminator found")
 
 func Unmarshal(inputStringLines []byte, v interface{}, linebreak LineBreak, arrayTerminator string) error {
 
@@ -199,6 +200,10 @@ func readFieldAddressAnnotation(annotation string) (absolute int, relativeLength
 	return
 }
 
+type DummyRec struct {
+	a string `bin:",2"`
+}
+
 // reflectAnnotatedFields - Read the whole struct
 //
 // Returns:
@@ -270,60 +275,44 @@ func reflectAnnotatedFields(inputBytes []byte, record reflect.Value, currentByte
 		switch reflect.TypeOf(recordField.Interface()).Kind() {
 		case reflect.Array, reflect.Slice:
 
-			if isArrayAnnotation {
-				// Array of Structs
+			if isArrayAnnotation { // Only annotated arrays are teaken into account
+
 				if reflect.TypeOf(recordField.Type()).Elem().Kind() == reflect.Struct {
-					fmt.Println("IsSliceOfStruct")
-					innerStructure := reflect.ValueOf(recordField.Type().Elem())
-					fmt.Printf("I know the type now %s as %#v\n", innerStructure, innerStructure)
-					sliceForNestedStructure := reflect.MakeSlice(recordField.Type(), 0, 0)
-					fmt.Println("Allocated slice .... ", sliceForNestedStructure)
 
-					// for bis_terminator_gesetzt {
-					var err error
-					allocatedElement := reflect.New(innerStructure.Type().Elem())
+					targetType := recordField.Type()
+					output := reflect.MakeSlice(targetType, 0, 0)
+					recordField.Set(output)
 
-					fmt.Printf("Allocated element %#v\n", allocatedElement.Kind())
+					for {
+						outputTarget := reflect.New(targetType.Elem())
+						lastByte := currentByte
+						currentByte, _, err = reflectInputToStruct(inputBytes, 1, currentByte, outputTarget.Interface(), arrayTerminator)
 
-					os.Exit(-1)
-					currentByte, _, err = reflectInputToStruct(inputBytes, 1, currentByte, allocatedElement, arrayTerminator)
-					if err != nil {
-						return currentByte, err
+						if lastByte == currentByte { // we didnt progess a single byte
+							fmt.Println("Stop iterating due to no content")
+							break
+						}
+
+						output = reflect.Append(output, outputTarget.Elem())
+						recordField.Set(output)
+
+						if err == errAbortArrayTerminator {
+							fmt.Println("Leave due to terminator")
+							break // terminate because the annotated terminator-field was set
+						}
+
+						if currentByte >= len(inputBytes) { // read to an end = peaceful exit
+							fmt.Println("Leave due to end")
+							break // read further than the end
+						}
 					}
-					fmt.Printf("  Adding nested struct %#v\n", allocatedElement.Elem())
-					sliceForNestedStructure = reflect.Append(sliceForNestedStructure, allocatedElement.Elem())
-
-					if currentByte >= len(inputBytes) { // read to an end = peaceful exit
-						return currentByte, nil
-					}
-					// }
-
-					reflect.ValueOf(record).Elem().Field(fieldNo).Set(sliceForNestedStructure)
-
-					/*
-						for currentInputLine < len(bufferedInputLines) {
-							allocatedElement := reflect.New(innerStructureType)
-							var err error
-							var retv RETV
-							currentInputLine, retv, err = reflectInputToStruct(bufferedInputLines, depth+1,
-								currentInputLine, allocatedElement.Interface())
-							if err != nil {
-								if retv == UNEXPECTED {
-									break
-								}
-								if retv == ERROR { // a serious error ends the processing
-									return currentInputLine, ERROR, err
-								}
-								sliceForNestedStructure = reflect.Append(sliceForNestedStructure, allocatedElement.Elem())
-								reflect.ValueOf(targetStruct).Elem().Field(i).Set(sliceForNestedStructure)
-							}
-							continue
-						}*/
 				} else {
-					// TODO: Is it not a struct, but an array of sth else
+					return currentByte, fmt.Errorf("Not implemented yet : Arrays of string,int,float")
 				}
 			}
-			// return currentByte, fmt.Errorf("Arrays and Slices not yet implemented")
+
+			// arrays which are not annotated are simply not processed
+
 		case reflect.String:
 			if absoluteAnnotatedPos > 0 {
 				currentByte = absoluteAnnotatedPos
@@ -336,8 +325,9 @@ func reflectAnnotatedFields(inputBytes []byte, record reflect.Value, currentByte
 			strvalue := string(inputBytes[currentByte : currentByte+relativeAnnotatedLength])
 
 			if hasTerminatorAnnotation {
+				fmt.Println("Found the terminator ánnotation ", strvalue)
 				if strvalue == arrayTerminator {
-					return currentByte, nil
+					return currentByte, errAbortArrayTerminator
 				}
 				break
 			}

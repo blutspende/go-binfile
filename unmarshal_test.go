@@ -16,25 +16,19 @@ type TestBinaryStructure1 struct {
 	SampleId            string `bin:",11"`     // 15
 	Dummy               string `bin:",4,trim"` // 26
 	BlockIdentification string `bin:",1,trim"` // 30
-	/*
-		TestResults         struct {
-			TestCode   string `bin:",2"`            // 1. 31  2. 44
-			TestResult string `bin:",9,trim"`       // 1. 33  2. 46
-			Flags      string `bin:",2"`            // 1. 42  2. 55
-			Terminator string `bin:",1,terminator"` // 1.     2. 57
-		}*/
 
 	TestResults []struct {
 		TestCode   string `bin:",2"`            // 1. 30  2. 43
 		TestResult string `bin:",9,trim"`       // 1. 32  2. 45
-		Flags      string `bin:",2"`            // 1. 41  2. 54
+		Flags      string `bin:",2,trim"`       // 1. 41  2. 54
 		Terminator string `bin:",1,terminator"` // 1.     2. 56
 	} `bin:",,array"`
-	DoNotSkipThisOneTEst string `bin:",1"` // 44 (with 1 run)
+
+	DoNotSkipThisOneTest string `bin:",1"` // 44 (with 1 run)
 }
 
-// POC Unmarshal binary protocol
-func TestUnmarshalBinary1(t *testing.T) {
+// POC Unmarshal binary protocol generic simple example
+/*func TestUnmarshalBinary1(t *testing.T) {
 	data := "D 03116506 044760722905768    E61     6.40  62      935  "
 	var r TestBinaryStructure1
 	err := Unmarshal([]byte(data), &r, CR, "\n")
@@ -49,25 +43,29 @@ func TestUnmarshalBinary1(t *testing.T) {
 	assert.Equal(t, "", r.Dummy)
 	assert.Equal(t, "E", r.BlockIdentification)
 
-	/*assert.Equal(t, 2, len(r.TestResults))
+	assert.Equal(t, 2, len(r.TestResults))
 
 	assert.Equal(t, "61", r.TestResults[0].TestCode)
-	assert.Equal(t, "6.4", r.TestResults[0].TestResult)
+	assert.Equal(t, "6.40", r.TestResults[0].TestResult)
 	assert.Equal(t, "", r.TestResults[0].Flags)
-	assert.Equal(t, "62", r.TestResults[0].TestCode)
-	assert.Equal(t, "935", r.TestResults[0].TestResult)
-	assert.Equal(t, "", r.TestResults[0].Flags)*/
-}
 
+	assert.Equal(t, "62", r.TestResults[1].TestCode)
+	assert.Equal(t, "935", r.TestResults[1].TestResult)
+	assert.Equal(t, "", r.TestResults[1].Flags)
+
+}
+*/
 type TestBinaryStructure2 struct {
 	DMessage []TestBinaryStructure1
 }
 
-/*
 func TestUnmarshalBinary2(t *testing.T) {
 	data := "D 03116506 044760722905768    E61     6.40  62      935  \u000DD 03116507 044860722905758    E61     6.86  62      883  "
 
 	var r TestBinaryStructure2
-	err := Unmarshal([]byte(data), &r, CR)
+	err := Unmarshal([]byte(data), &r, CR, "\r")
+
 	assert.Equal(t, nil, err)
-}*/
+
+	assert.Equal(t, 2, len(r.DMessage))
+}
