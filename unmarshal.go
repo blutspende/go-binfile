@@ -15,7 +15,8 @@ const (
 )
 
 var ErrAbortArrayTerminator = fmt.Errorf("aborting due to array-terminator found")
-var ErrInvalidAddressAnnotation = fmt.Errorf("invalid address annotation")
+
+// var ErrInvalidAddressAnnotation = fmt.Errorf("invalid address annotation")
 var ErrAnnotatedFieldNotWritable = fmt.Errorf("annotated Field is not writable")
 
 func Unmarshal(inputBytes []byte, target interface{}, arrayTerminator string) error {
@@ -50,8 +51,8 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 		absoluteAnnotatedPos := -1
 		relativeAnnotatedLength := -1
 		if len(binTagsList) >= 1 {
-			if !isValidAddressAnnotation(binTagsList[0]) {
-				return currentByte, ErrInvalidAddressAnnotation
+			if !isValidAddressAnnotation(binTagsList[0]) && binTagsList[0] != "" {
+				return currentByte, fmt.Errorf("invalid address annotation field '%s' `%s`", record.Type().Field(fieldNo).Name, binTag)
 			}
 			absoluteAnnotatedPos, relativeAnnotatedLength = readAddressAnnotation(binTagsList[0])
 		}
@@ -133,7 +134,7 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 		case reflect.String:
 
 			if relativeAnnotatedLength < 0 { // Requires a valid length
-				return currentByte, ErrInvalidAddressAnnotation
+				return currentByte, fmt.Errorf("invalid address annotation field '%s' `%s`", record.Type().Field(fieldNo).Name, binTag)
 			}
 
 			if !recordField.CanSet() {
@@ -161,7 +162,7 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 		case reflect.Int:
 
 			if relativeAnnotatedLength < 0 { // Requires a valid length
-				return currentByte, ErrInvalidAddressAnnotation
+				return currentByte, fmt.Errorf("invalid address annotation field '%s' `%s`", record.Type().Field(fieldNo).Name, binTag)
 			}
 
 			strvalue := string(inputBytes[currentByte : currentByte+relativeAnnotatedLength])
@@ -179,7 +180,7 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 		case reflect.Float32:
 
 			if relativeAnnotatedLength < 0 { // Requires a valid length
-				return currentByte, ErrInvalidAddressAnnotation
+				return currentByte, fmt.Errorf("invalid address annotation field '%s' `%s`", record.Type().Field(fieldNo).Name, binTag)
 			}
 
 			value := string(inputBytes[currentByte : currentByte+relativeAnnotatedLength])
@@ -195,7 +196,7 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 		case reflect.Float64:
 
 			if relativeAnnotatedLength < 0 { // Requires a valid length
-				return currentByte, ErrInvalidAddressAnnotation
+				return currentByte, fmt.Errorf("invalid address annotation field '%s' `%s`", record.Type().Field(fieldNo).Name, binTag)
 			}
 
 			value := string(inputBytes[currentByte : currentByte+relativeAnnotatedLength])

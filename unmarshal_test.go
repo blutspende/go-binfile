@@ -3,7 +3,7 @@ package binfile
 import (
 	"testing"
 
-	"github.com/go-playground/assert/v2"
+	"github.com/stretchr/testify/assert"
 )
 
 type TestBinaryStructure1 struct {
@@ -30,8 +30,8 @@ func TestUnmarshalBinary1(t *testing.T) {
 	data := "D 03116506 044760722905768    E61     6.40  62      935  "
 	var r TestBinaryStructure1
 	err := Unmarshal([]byte(data), &r, "\r")
-	// err := Unmarshal([]byte(data), &r, CR, "\n")
-	assert.Equal(t, nil, err)
+
+	assert.Nil(t, err)
 	assert.Equal(t, "D ", r.RecordType)
 	assert.Equal(t, 3, r.UnitNo)
 	assert.Equal(t, 1165, r.RackNumber)
@@ -112,16 +112,23 @@ func TestUnmarshalMultipleRecords(t *testing.T) {
 }
 
 type invalidAddressAnnoation struct {
-	Field string `bin:"-1:"` // invalid without a length
+	FieldInvalid string `bin:"-1:"` // invalid without a length
+}
+
+type onlyValidAddressAnnotatoins struct {
+	FieldValid string `bin:":2"` // this should pass
 }
 
 func TestExpectInvalidAddressAnnotationToFail(t *testing.T) {
 	data := "123456"
 
-	var r invalidAddressAnnoation
-	err := Unmarshal([]byte(data), &r, "\r")
+	var invalid invalidAddressAnnoation
+	err := Unmarshal([]byte(data), &invalid, "\r")
+	assert.Equal(t, "invalid address annotation field 'FieldInvalid' `-1:`", err.Error())
 
-	assert.Equal(t, ErrInvalidAddressAnnotation, err)
+	var onlyValid onlyValidAddressAnnotatoins
+	err = Unmarshal([]byte(data), &onlyValid, "\r")
+	assert.Nil(t, err)
 }
 
 type absoluteAddressing struct {
