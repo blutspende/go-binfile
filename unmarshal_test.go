@@ -29,7 +29,7 @@ type TestBinaryStructure1 struct {
 func TestUnmarshalBinary1(t *testing.T) {
 	data := "D 03116506 044760722905768    E61     6.40  62      935  "
 	var r TestBinaryStructure1
-	err := Unmarshal([]byte(data), &r, "\r")
+	err := Unmarshal([]byte(data), &r, EncodingUTF8, TimezoneUTC, "\r")
 
 	assert.Nil(t, err)
 	assert.Equal(t, "D ", r.RecordType)
@@ -64,7 +64,7 @@ func TestUnmarshalMultipleRecords(t *testing.T) {
 	data := "D 03116506 044760722905768    E61     6.40  62      935  \u000DD 03116507 044860722905758    E61     6.86  62      883  "
 
 	var r TestBinaryStructure2
-	err := Unmarshal([]byte(data), &r, "\r")
+	err := Unmarshal([]byte(data), &r, EncodingUTF8, TimezoneUTC, "\r")
 
 	assert.Equal(t, nil, err)
 
@@ -115,7 +115,7 @@ type invalidAddressAnnoation struct {
 	FieldInvalid string `bin:"-1:"` // invalid without a length
 }
 
-type onlyValidAddressAnnotatoins struct {
+type onlyValidAddressAnnotations struct {
 	FieldValid string `bin:":2"` // this should pass
 }
 
@@ -123,11 +123,11 @@ func TestExpectInvalidAddressAnnotationToFail(t *testing.T) {
 	data := "123456"
 
 	var invalid invalidAddressAnnoation
-	err := Unmarshal([]byte(data), &invalid, "\r")
+	err := Unmarshal([]byte(data), &invalid, EncodingUTF8, TimezoneUTC, "\r")
 	assert.Equal(t, "invalid address annotation field 'FieldInvalid' `-1:`", err.Error())
 
-	var onlyValid onlyValidAddressAnnotatoins
-	err = Unmarshal([]byte(data), &onlyValid, "\r")
+	var onlyValid onlyValidAddressAnnotations
+	err = Unmarshal([]byte(data), &onlyValid, EncodingUTF8, TimezoneUTC, "\r")
 	assert.Nil(t, err)
 }
 
@@ -140,7 +140,7 @@ func TestAbsoluteAddressing(t *testing.T) {
 	data := "01xxx56xxx"
 
 	var r absoluteAddressing
-	err := Unmarshal([]byte(data), &r, "\r")
+	err := Unmarshal([]byte(data), &r, EncodingUTF8, TimezoneUTC, "\r")
 
 	assert.Equal(t, nil, err)
 

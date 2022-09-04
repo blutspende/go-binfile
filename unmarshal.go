@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	ANNOTATION_TRIM       = "trim"
-	ANNOTATION_TERMINATOR = "terminator"
+	ANNOTATION_TRIM       = "trim"       // Trim the result (only for string)
+	ANNOTATION_TERMINATOR = "terminator" // Annotate an indicator for ends fo lists (typically sth like CR or CRLF)
 )
 
 var ErrAbortArrayTerminator = fmt.Errorf("aborting due to array-terminator found")
@@ -19,7 +19,7 @@ var ErrAbortArrayTerminator = fmt.Errorf("aborting due to array-terminator found
 // var ErrInvalidAddressAnnotation = fmt.Errorf("invalid address annotation")
 var ErrAnnotatedFieldNotWritable = fmt.Errorf("annotated Field is not writable")
 
-func Unmarshal(inputBytes []byte, target interface{}, arrayTerminator string) error {
+func Unmarshal(inputBytes []byte, target interface{}, enc Encoding, tz Timezone, arrayTerminator string) error {
 
 	if reflect.TypeOf(target).Kind() != reflect.Pointer && reflect.ValueOf(target).Elem().Type().Kind() != reflect.Struct {
 		return fmt.Errorf("Unmarshal: Target '%s' is of Type %s, but require reflect.Struct", reflect.TypeOf(target).Name(), reflect.TypeOf(target))
@@ -27,13 +27,13 @@ func Unmarshal(inputBytes []byte, target interface{}, arrayTerminator string) er
 
 	targetStruct := reflect.ValueOf(target).Elem()
 
-	_, err := internalUnmarshal(inputBytes, 0, targetStruct, "\r", 1)
+	_, err := internalUnmarshal(inputBytes, 0, targetStruct, "\r", 1, enc, tz)
 
 	return err
 }
 
 // use this for recursion
-func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value, arrayTerminator string, depth int) (int, error) {
+func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value, arrayTerminator string, depth int, enc Encoding, tz Timezone) (int, error) {
 
 	for fieldNo := 0; fieldNo < record.NumField(); fieldNo++ {
 
@@ -102,7 +102,7 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 					outputTarget := reflect.New(targetType.Elem())
 					lastByte := currentByte
 					var err error
-					currentByte, err = internalUnmarshal(inputBytes, currentByte, outputTarget.Elem(), arrayTerminator, depth+1)
+					currentByte, err = internalUnmarshal(inputBytes, currentByte, outputTarget.Elem(), arrayTerminator, depth+1, enc, tz)
 
 					if lastByte == currentByte { // we didnt progess a single byte
 						break
@@ -126,7 +126,7 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 
 		case reflect.Struct:
 			var err error
-			currentByte, err = internalUnmarshal(inputBytes, currentByte, recordField, arrayTerminator, depth+1)
+			currentByte, err = internalUnmarshal(inputBytes, currentByte, recordField, arrayTerminator, depth+1, enc, tz)
 			if err != nil { // If the nested structure did fail, then bail out
 				return currentByte, err
 			}
