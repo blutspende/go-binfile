@@ -7,19 +7,19 @@ import (
 )
 
 type TestBinaryStructure1 struct {
-	RecordType          string `bin:0,2`
-	UnitNo              int    `bin:,2`
-	RackNumber          int    `bin:,4`
-	CupPosition         int    `bin:,2`
-	SampleType          string `bin:,1,trim`
-	SampleNo            string `bin:,4`
-	SampleId            string `bin:,11`
-	Dummy               string `bin:,4,trim`
-	BlockIdentification string `bin:,1,trim`
+	RecordType          string `bin:",2"`
+	UnitNo              int    `bin:",2"`
+	RackNumber          int    `bin:",4"`
+	CupPosition         int    `bin:",2"`
+	SampleType          string `bin:",1,trim"`
+	SampleNo            string `bin:",4"`
+	SampleId            string `bin:",11"`
+	Dummy               string `bin:",4,trim"`
+	BlockIdentification string `bin:",1,trim"`
 	TestResults         []struct {
-		TestCode   string `bin:,2`
-		TestResult string `bin:,9,trim`
-		Flags      string `bin:,2`
+		TestCode   string `bin:",2"`
+		TestResult string `bin:",9,trim"`
+		Flags      string `bin:",2"`
 	}
 }
 
@@ -27,8 +27,8 @@ type TestBinaryStructure1 struct {
 func TestUnmarshalBinary1(t *testing.T) {
 	data := "D 03116506 044760722905768    E61     6.40  62      935  "
 	var r TestBinaryStructure1
-	unmarshal([]byte(data), r, CR)
-
+	err := Unmarshal([]byte(data), &r, CR)
+	assert.Equal(t, nil, err)
 	assert.Equal(t, "D ", r.RecordType)
 	assert.Equal(t, 3, r.UnitNo)
 	assert.Equal(t, 1165, r.RackNumber)
@@ -57,5 +57,6 @@ func TestUnmarshalBinary2(t *testing.T) {
 	data := "D 03116506 044760722905768    E61     6.40  62      935  \u000DD 03116507 044860722905758    E61     6.86  62      883  "
 
 	var r TestBinaryStructure2
-	unmarshal([]byte(data), r, CR)
+	err := Unmarshal([]byte(data), &r, CR)
+	assert.Equal(t, nil, err)
 }
