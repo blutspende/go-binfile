@@ -3,6 +3,7 @@ package binfile
 import (
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -149,11 +150,12 @@ func TestAbsoluteAddressing(t *testing.T) {
 }
 
 type testUnannotated struct {
-	AnnotatedField          string `bin:":2"`
-	UnannotatedStringField  string
-	UnannotatedIntField     int
-	UnanntoatedFloat32Field float32
-	UnannotatedFloat64Field float64
+	AnnotatedField             string `bin:":2"`
+	UnannotatedForeignStructre uuid.UUID
+	UnannotatedStringField     string
+	UnannotatedIntField        int
+	UnanntoatedFloat32Field    float32
+	UnannotatedFloat64Field    float64
 }
 
 //TEST: bug: unannotated fields in struct did cause an error.

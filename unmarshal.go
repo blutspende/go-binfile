@@ -89,12 +89,13 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 			absoluteAnnotatedPos, relativeAnnotatedLength, currentByte)
 		*/
 		switch reflect.TypeOf(recordField.Interface()).Kind() {
-		case reflect.Array, reflect.Slice:
+		case reflect.Slice:
 
 			switch reflect.TypeOf(recordField.Type()).Elem().Kind() { // Nested: all here is an array of something
 			case reflect.Struct:
 
 				targetType := recordField.Type()
+
 				output := reflect.MakeSlice(targetType, 0, 0)
 				recordField.Set(output)
 
