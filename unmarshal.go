@@ -114,7 +114,7 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 
 		if absoluteAnnotatedPos > 0 {
 			// The current field has an absolute Address. This causes the cursor to be forwarded
-			currentByte = initialStartByte + absoluteAnnotatedPos - 1
+			currentByte = initialStartByte + absoluteAnnotatedPos
 		}
 
 		if relativeAnnotatedLength > 0 {

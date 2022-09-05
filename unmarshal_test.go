@@ -198,7 +198,7 @@ func TestInaccesibleFields(t *testing.T) {
 type nested struct {
 	Field1 string `bin:":1"`
 	Field2 string `bin:":2"`
-	Field3 string `bin:"4:1,terminator"`
+	Field3 string `bin:"3:1,terminator"`
 }
 
 // TEST: top class is an array
