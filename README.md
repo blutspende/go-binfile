@@ -2,7 +2,7 @@
 Libarary for scanning binary transmissions
 
 ### Install
-```go get github.com/DRK-Blutspende-BaWueHe/go-bin```
+```go get github.com/DRK-Blutspende-BaWueHe/go-binfile```
 
 ## Features
   * Unmarshalling byte-arrays with annotated structs
