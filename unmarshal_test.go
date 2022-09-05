@@ -173,3 +173,19 @@ func TestUnanotatedFieldsAreSkipped(t *testing.T) {
 	assert.Equal(t, float32(0), r.UnanntoatedFloat32Field)
 	assert.Equal(t, float64(0), r.UnannotatedFloat64Field)
 }
+
+type testUnaccisbleFields struct {
+	MeIsAccessible                     string `bin:":1"`
+	meIsNotAccessibleWithoutAnnotation string
+}
+
+// TEST: reprduces a bug that crashed unexported fields
+func TestInaccesibleFields(t *testing.T) {
+	data := "1234567"
+
+	var r testUnaccisbleFields
+	err := Unmarshal([]byte(data), &r, EncodingUTF8, TimezoneUTC, "")
+
+	assert.Nil(t, err)
+	assert.Equal(t, "1", r.MeIsAccessible)
+}

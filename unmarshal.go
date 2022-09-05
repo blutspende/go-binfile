@@ -88,6 +88,11 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 			record.Type().Field(fieldNo).Name,
 			absoluteAnnotatedPos, relativeAnnotatedLength, currentByte)
 		*/
+
+		if !recordField.CanInterface() {
+			continue // field is not accessible
+		}
+
 		switch reflect.TypeOf(recordField.Interface()).Kind() {
 		case reflect.Slice:
 
