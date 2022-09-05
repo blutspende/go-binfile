@@ -177,6 +177,7 @@ func TestUnanotatedFieldsAreSkipped(t *testing.T) {
 type testUnaccisbleFields struct {
 	MeIsAccessible                     string `bin:":1"`
 	meIsNotAccessibleWithoutAnnotation string
+	meArray                            []string
 }
 
 // TEST: reprduces a bug that crashed unexported fields

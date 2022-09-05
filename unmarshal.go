@@ -35,6 +35,10 @@ func Unmarshal(inputBytes []byte, target interface{}, enc Encoding, tz Timezone,
 // use this for recursion
 func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value, arrayTerminator string, depth int, enc Encoding, tz Timezone) (int, error) {
 
+	if record.Kind() != reflect.Struct {
+		return currentByte, nil // its not a desaster if we accidentaly descended into a non-struct;
+	}
+
 	for fieldNo := 0; fieldNo < record.NumField(); fieldNo++ {
 
 		recordField := record.Field(fieldNo)
