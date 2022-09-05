@@ -27,7 +27,7 @@ func Unmarshal(inputBytes []byte, target interface{}, enc Encoding, tz Timezone,
 
 	targetStruct := reflect.ValueOf(target).Elem()
 
-	_, err := internalUnmarshal(inputBytes, 0, targetStruct, "\r", 1, enc, tz)
+	_, err := internalUnmarshal(inputBytes, 0, targetStruct, arrayTerminator, 1, enc, tz)
 
 	return err
 }
@@ -51,7 +51,7 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 		absoluteAnnotatedPos := -1
 		relativeAnnotatedLength := -1
 		if len(binTagsList) >= 1 {
-			if !isValidAddressAnnotation(binTagsList[0]) && binTagsList[0] != "" {
+			if !isValidAddressAnnotation(binTagsList[0]) && binTagsList[0] != "" && binTag != "" {
 				return currentByte, fmt.Errorf("invalid address annotation field '%s' `%s`", record.Type().Field(fieldNo).Name, binTag)
 			}
 			absoluteAnnotatedPos, relativeAnnotatedLength = readAddressAnnotation(binTagsList[0])
@@ -133,6 +133,10 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 
 		case reflect.String:
 
+			if binTag == "" {
+				continue // Do not process unannotated fields
+			}
+
 			if relativeAnnotatedLength < 0 { // Requires a valid length
 				return currentByte, fmt.Errorf("invalid address annotation field '%s' `%s`", record.Type().Field(fieldNo).Name, binTag)
 			}
@@ -161,6 +165,10 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 
 		case reflect.Int:
 
+			if binTag == "" {
+				continue // Do not process unannotated fields
+			}
+
 			if relativeAnnotatedLength < 0 { // Requires a valid length
 				return currentByte, fmt.Errorf("invalid address annotation field '%s' `%s`", record.Type().Field(fieldNo).Name, binTag)
 			}
@@ -179,6 +187,10 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 
 		case reflect.Float32:
 
+			if binTag == "" {
+				continue // Do not process unannotated fields
+			}
+
 			if relativeAnnotatedLength < 0 { // Requires a valid length
 				return currentByte, fmt.Errorf("invalid address annotation field '%s' `%s`", record.Type().Field(fieldNo).Name, binTag)
 			}
@@ -194,6 +206,10 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 			reflect.ValueOf(recordField.Addr().Interface()).Elem().Set(reflect.ValueOf(float32(num)))
 
 		case reflect.Float64:
+
+			if binTag == "" {
+				continue // Do not process unannotated fields
+			}
 
 			if relativeAnnotatedLength < 0 { // Requires a valid length
 				return currentByte, fmt.Errorf("invalid address annotation field '%s' `%s`", record.Type().Field(fieldNo).Name, binTag)

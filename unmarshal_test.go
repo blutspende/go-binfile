@@ -147,3 +147,27 @@ func TestAbsoluteAddressing(t *testing.T) {
 	assert.Equal(t, "01", r.Field1)
 	assert.Equal(t, "56", r.Field2)
 }
+
+type testUnannotated struct {
+	AnnotatedField          string `bin:":2"`
+	UnannotatedStringField  string
+	UnannotatedIntField     int
+	UnanntoatedFloat32Field float32
+	UnannotatedFloat64Field float64
+}
+
+//TEST: bug: unannotated fields in struct did cause an error.
+// Unannotated fields should just be skipped
+func TestUnanotatedFieldsAreSkipped(t *testing.T) {
+	data := "1234567"
+
+	var r testUnannotated
+	err := Unmarshal([]byte(data), &r, EncodingUTF8, TimezoneUTC, "")
+
+	assert.Nil(t, err)
+	assert.Equal(t, "12", r.AnnotatedField)
+	assert.Equal(t, "", r.UnannotatedStringField) // Check that it didnt touch our not-annotated field
+	assert.Equal(t, 0, r.UnannotatedIntField)
+	assert.Equal(t, float32(0), r.UnanntoatedFloat32Field)
+	assert.Equal(t, float64(0), r.UnannotatedFloat64Field)
+}
