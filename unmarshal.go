@@ -21,23 +21,63 @@ var ErrAnnotatedFieldNotWritable = fmt.Errorf("annotated Field is not writable")
 
 func Unmarshal(inputBytes []byte, target interface{}, enc Encoding, tz Timezone, arrayTerminator string) error {
 
-	if reflect.TypeOf(target).Kind() != reflect.Pointer && reflect.ValueOf(target).Elem().Type().Kind() != reflect.Struct {
-		return fmt.Errorf("Unmarshal: Target '%s' is of Type %s, but require reflect.Struct", reflect.TypeOf(target).Name(), reflect.TypeOf(target))
+	switch reflect.ValueOf(target).Kind() {
+	case reflect.Ptr:
+		nested := reflect.ValueOf(target).Elem()
+		switch nested.Kind() {
+		case reflect.Struct:
+			targetStruct := reflect.ValueOf(target).Elem()
+			_, err := internalUnmarshal(inputBytes, 0, targetStruct, arrayTerminator, 1, enc, tz)
+			return err // its not a desaster if we accidentaly descended into a non-struct;
+		case reflect.Slice:
+			targetSlice := reflect.ValueOf(target).Elem()
+			targetType := targetSlice.Type()
+
+			currentByte := 0
+			for {
+				outputTarget := reflect.New(targetType.Elem())
+
+				var err error
+				lastByte := currentByte
+				currentByte, err = internalUnmarshal(inputBytes, currentByte, outputTarget.Elem(), arrayTerminator, 1, enc, tz)
+
+				if lastByte == currentByte {
+					return nil // no further progress
+				}
+
+				if err == nil || err == ErrAbortArrayTerminator {
+					// helpflul debugging
+					// fmt.Printf("Adding slice %#v\n", outputTarget.Elem())
+					targetSlice = reflect.Append(targetSlice, outputTarget.Elem())
+					reflect.ValueOf(target).Elem().Set(targetSlice)
+				}
+
+				if currentByte >= len(inputBytes) {
+					return nil // the end (do not move this lower in code, as the boundary check has to be first)
+				}
+
+				if err == ErrAbortArrayTerminator {
+					continue // just the end of an array
+				}
+
+				if err != nil && err != ErrAbortArrayTerminator {
+					return err // failed
+				}
+
+			}
+		default:
+			return fmt.Errorf("unable to unmarshal %s of type %s", reflect.TypeOf(target).Name(), reflect.TypeOf(target))
+		}
+	default:
+		return fmt.Errorf("unable to unmarshal %s of type %s", reflect.TypeOf(target).Name(), reflect.TypeOf(target))
 	}
 
-	targetStruct := reflect.ValueOf(target).Elem()
-
-	_, err := internalUnmarshal(inputBytes, 0, targetStruct, arrayTerminator, 1, enc, tz)
-
-	return err
 }
 
 // use this for recursion
 func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value, arrayTerminator string, depth int, enc Encoding, tz Timezone) (int, error) {
 
-	if record.Kind() != reflect.Struct {
-		return currentByte, nil // its not a desaster if we accidentaly descended into a non-struct;
-	}
+	initialStartByte := currentByte
 
 	for fieldNo := 0; fieldNo < record.NumField(); fieldNo++ {
 
@@ -74,12 +114,12 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 
 		if absoluteAnnotatedPos > 0 {
 			// The current field has an absolute Address. This causes the cursor to be forwarded
-			currentByte = absoluteAnnotatedPos
+			currentByte = initialStartByte + absoluteAnnotatedPos
 		}
 
 		if relativeAnnotatedLength > 0 {
 			// Having a length, the total length is not supposed to exceed the boundaries of the input
-			if currentByte+relativeAnnotatedLength > len(inputBytes) {
+			if currentByte+relativeAnnotatedLength-1 > len(inputBytes) {
 				return currentByte, fmt.Errorf("reading out of bounds position %d in input data of %d bytes", currentByte+relativeAnnotatedLength, len(inputBytes))
 			}
 		}
@@ -99,7 +139,6 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 
 		switch reflect.TypeOf(recordField.Interface()).Kind() {
 		case reflect.Slice:
-
 			switch reflect.TypeOf(recordField.Type()).Elem().Kind() { // Nested: all here is an array of something
 			case reflect.Struct:
 
@@ -135,6 +174,7 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 			}
 
 		case reflect.Struct:
+
 			var err error
 			currentByte, err = internalUnmarshal(inputBytes, currentByte, recordField, arrayTerminator, depth+1, enc, tz)
 			if err != nil { // If the nested structure did fail, then bail out
@@ -159,6 +199,7 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 
 			if hasTerminatorAnnotation {
 				if strvalue == arrayTerminator {
+					reflect.ValueOf(recordField.Addr().Interface()).Elem().SetString(reflect.ValueOf(arrayTerminator).String())
 					// Forward by annotated length only when terminator applies
 					currentByte += relativeAnnotatedLength
 					return currentByte, ErrAbortArrayTerminator
