@@ -1,6 +1,6 @@
 package binfile
 
-func marshal(v interface{}) []byte {
+func Marshal(v interface{}) []byte {
 
 	return []byte{}
 }
