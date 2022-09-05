@@ -27,7 +27,7 @@ func Unmarshal(inputBytes []byte, target interface{}, enc Encoding, tz Timezone,
 
 	targetStruct := reflect.ValueOf(target).Elem()
 
-	_, err := internalUnmarshal(inputBytes, 0, targetStruct, "\r", 1, enc, tz)
+	_, err := internalUnmarshal(inputBytes, 0, targetStruct, arrayTerminator, 1, enc, tz)
 
 	return err
 }
