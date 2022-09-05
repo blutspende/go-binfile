@@ -174,10 +174,14 @@ func TestUnanotatedFieldsAreSkipped(t *testing.T) {
 	assert.Equal(t, float64(0), r.UnannotatedFloat64Field)
 }
 
+type meArrayElement struct {
+	SomeData string
+}
+
 type testUnaccisbleFields struct {
 	MeIsAccessible                     string `bin:":1"`
 	meIsNotAccessibleWithoutAnnotation string
-	meArray                            []string
+	MeArray                            []meArrayElement
 }
 
 // TEST: reprduces a bug that crashed unexported fields
@@ -189,4 +193,22 @@ func TestInaccesibleFields(t *testing.T) {
 
 	assert.Nil(t, err)
 	assert.Equal(t, "1", r.MeIsAccessible)
+}
+
+type nested struct {
+	Field1 string `bin:":1"`
+	Field2 string `bin:":2"`
+	Field3 string `bin:"4:1,terminator"`
+}
+
+// TEST: top class is an array
+func TestTopIsAnArray(t *testing.T) {
+	data := "123A456A789A"
+
+	r := make([]nested, 0)
+	err := Unmarshal([]byte(data), &r, EncodingUTF8, TimezoneUTC, "A")
+
+	assert.Nil(t, err)
+
+	assert.Equal(t, 3, len(r))
 }
