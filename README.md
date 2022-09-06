@@ -11,30 +11,30 @@ Libarary for scanning binary transmissions
 ## Usage
 Annotate your structure and then unmarshal using the library to map the values
 ```
-type TestBinaryStructure1 struct {
-	RecordType          string `bin:":2"`      // 0
-	UnitNo              int    `bin:":2"`      // 2
-	RackNumber          int    `bin:":4"`      // 4
-	CupPosition         int    `bin:":2"`      // 8
-	SampleType          string `bin:":1,trim"` // 10
-	SampleNo            string `bin:":4"`      // 11
-	SampleId            string `bin:":11"`     // 15
-	Dummy               string `bin:":4,trim"` // 26
-	BlockIdentification string `bin:":1,trim"` // 30
+type DataMessage struct {
+	RecordType          string `bin:":2"`      
+	UnitNo              int    `bin:":2"`      
+	RackNumber          int    `bin:":4"`      
+	CupPosition         int    `bin:":2"`      
+	SampleType          string `bin:":1,trim"` 
+	SampleNo            string `bin:":4"`      
+	SampleId            string `bin:":11"`     
+	Dummy               string `bin:":4,trim"` 
+	BlockIdentification string `bin:":1,trim"` 
 
 	TestResults []struct {
-		TestCode   string `bin:":2"`            // 1. 30  2. 43
-		TestResult string `bin:":9,trim"`       // 1. 32  2. 45
-		Flags      string `bin:":2,trim"`       // 1. 41  2. 54
-		Terminator string `bin:":1,terminator"` // 1.     2. 56
+		TestCode   string `bin:":2"`            
+		TestResult string `bin:":9,trim"`       
+		Flags      string `bin:":2,trim"`       
+		Terminator string `bin:":1,terminator"` 
 	}
 }
 
 func main() {
     ...
-    data := "D 03116506 044760722905768    E61     6.40  62      935  "
+    data := "D 03116506 044760722905768    E61     6.40  62      935  \r"
 	
-    var r TestBinaryStructure1
+    var r DataMessage
 	err := binfile.Unmarshal([]byte(data), &r, binfile.EncodingUTF8, binfile.TimezoneUTC, "\r")
     ...
 }
