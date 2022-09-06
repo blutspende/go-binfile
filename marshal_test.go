@@ -24,3 +24,15 @@ func TestMarhalGeneric(t *testing.T) {
 
 	assert.Equal(t, "123456xxaa", data)
 }
+
+/*
+func TestMarshalArray(t *testing.T) {
+	r := make([]testGenericMarshal, 0)
+	r = append(r, testGenericMarshal{someField1: "AB", someField2: "CDEF"})
+	r = append(r, testGenericMarshal{someField1: "12", someField2: "3456"})
+
+	data, err := Marshal(r, 'x', EncodingUTF8, TimezoneEuropeBerlin, "\r")
+
+	assert.Nil(t, err)
+	assert.Equal(t, "ABCDEFxx  \r123456xx  \r", data)
+}*/
