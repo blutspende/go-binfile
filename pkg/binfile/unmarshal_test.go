@@ -18,7 +18,7 @@ type TestBinaryStructure1 struct {
 	Dummy               string `bin:":4,trim"` // 26
 	BlockIdentification string `bin:":1,trim"` // 30
 
-	TestResults []TestResultsStructure
+	TestResults []TestResultsStructure `bin:"array:terminator"`
 }
 
 type TestResultsStructure struct {
@@ -58,7 +58,7 @@ func TestUnmarshalBinary1(t *testing.T) {
 }
 
 type TestBinaryStructure2 struct {
-	DMessage []TestBinaryStructure1
+	DMessage []TestBinaryStructure1 `bin:"array:terminator"`
 }
 
 // This test inspired by the AU-600 protocol:

@@ -178,9 +178,9 @@ func TestMarshalFloat(t *testing.T) {
 }
 
 type testNestedMarshal struct {
-	Anything     int `bin:"2"`
+	Anything     int `bin:":2"`
 	NestedStruct struct {
-		SomethingNested int `bin:"2"`
+		SomethingNested int `bin:":2"`
 	}
 }
 
@@ -198,7 +198,8 @@ func TestMarsalNested(t *testing.T) {
 }
 
 type testSliceMarshal struct {
-	MoreElements []testSliceInnerMarshal
+	MoreElements []testSliceInnerMarshal `bin:"array:terminator"`
+	ALotOfInts   []int                   `bin:"array:terminator,:1"`
 }
 type testSliceInnerMarshal struct {
 	InnerData1 int `bin:":1"`
@@ -218,25 +219,14 @@ func TestMarshalSlices(t *testing.T) {
 			InnerData2: 4,
 		},
 	}
+	r.ALotOfInts = []int{0, 1, 2, 3}
 
 	var data, err = Marshal(r, 'x', EncodingUTF8, TimezoneEuropeBerlin, "\r")
 
 	assert.Nil(t, err)
 
-	assert.Equal(t, "1234\r", string(data))
+	assert.Equal(t, "1234\r0123\r", string(data))
 }
-
-/*
-func TestMarshalArray(t *testing.T) {
-	r := make([]testGenericMarshal, 0)
-	r = append(r, testGenericMarshal{someField1: "AB", someField2: "CDEF"})
-	r = append(r, testGenericMarshal{someField1: "12", someField2: "3456"})
-
-	data, err := Marshal(r, 'x', EncodingUTF8, TimezoneEuropeBerlin, "\r")
-
-	assert.Nil(t, err)
-	assert.Equal(t, "ABCDEFxx  \r123456xx  \r", data)
-}*/
 
 // --------------------------------------------------------------------------------------------------
 type testGenericMarshal struct {
@@ -245,7 +235,7 @@ type testGenericMarshal struct {
 	SomeField3      string  `bin:"8:2"` // add a "jump" of two charachters to force to fill up
 	IntField        int     `bin:":3"`
 	IntFieldPadding int     `bin:":3,padzero"`
-	DecimalField    float32 `bin:":"`
+	DecimalField    float32 `bin:":5,decimal(2)"`
 }
 
 func TestMarhalGeneric(t *testing.T) {
@@ -264,15 +254,21 @@ func TestMarhalGeneric(t *testing.T) {
 }
 
 // --------------------------------------------------------------------------------------------------
+type testGenericMarshal2 struct {
+	SomeField1 string `bin:":2"`
+	SomeField2 string `bin:":4"`
+	SomeField3 string `bin:"8:2"` // add a "jump" of two charachters to force to fill up
+}
+
 func TestMarshalArray(t *testing.T) {
-	r := make([]testGenericMarshal, 0)
-	r = append(r, testGenericMarshal{SomeField1: "AB", SomeField2: "CDEF"})
-	r = append(r, testGenericMarshal{SomeField1: "12", SomeField2: "3456"})
+	r := make([]testGenericMarshal2, 0)
+	r = append(r, testGenericMarshal2{SomeField1: "AB", SomeField2: "CDEF"})
+	r = append(r, testGenericMarshal2{SomeField1: "12", SomeField2: "3456"})
 
 	data, err := Marshal(r, 'x', EncodingUTF8, TimezoneEuropeBerlin, "\r")
 
 	assert.Nil(t, err)
-	assert.Equal(t, "ABCDEFxx  \r123456xx  \r", data)
+	assert.Equal(t, "ABCDEFxx  \r123456xx  \r\r", data)
 }
 
 // --------------------------------------------------------------------------------------------------
@@ -281,7 +277,8 @@ type testFixedLenarrayInnerStruct struct {
 }
 
 type testFixedLenArray struct {
-	SomeArray []testFixedLenarrayInnerStruct `bin:"array:5"`
+	SomeArray  []testFixedLenarrayInnerStruct `bin:"array:5"`
+	LotsOfInts []int                          `bin:"array:3,:1"`
 }
 
 func TestMarshalArrayWithFixedLength(t *testing.T) {
@@ -293,6 +290,7 @@ func TestMarshalArrayWithFixedLength(t *testing.T) {
 			{Field1: "N3"},
 			{Field1: "N4"},
 		},
+		LotsOfInts: []int{1},
 	}
 
 	FixedLenArray6Elements := testFixedLenArray{
@@ -304,19 +302,27 @@ func TestMarshalArrayWithFixedLength(t *testing.T) {
 			{Field1: "N5"},
 			{Field1: "N6"},
 		},
+		LotsOfInts: []int{0, 1, 2, 3, 4},
 	}
 
 	// padding zeros for a required length of 5
 	data, err := Marshal(FixedLenArray4Elements, 'x', EncodingUTF8, TimezoneEuropeBerlin, "")
 	assert.Nil(t, err)
-	assert.Equal(t, append([]byte("N1N2N3N4"), []byte{0, 0}...), data)
+
+	var result = []byte("N1N2N3N4")
+	result = append(result, []byte{0, 0}...)
+	result = append(result, []byte("1")...)
+	result = append(result, []byte{0, 0}...)
+
+	assert.Equal(t, result, data)
 
 	// 6 Elements in a 5 elment array expected to b cut to 5 and then terminated
 	data, err = Marshal(FixedLenArray6Elements, 'x', EncodingUTF8, TimezoneEuropeBerlin, "_")
 	assert.Nil(t, err)
-	assert.Equal(t, "N1N2N3N4N5_", string(data))
+	assert.Equal(t, "N1N2N3N4N5_012_", string(data))
 }
 
+/*
 // --------------------------------------------------------------------------------------------------
 type testDynamicLenArrayInnerStruct struct {
 	Field1 string `bin:":2"`
@@ -342,3 +348,4 @@ func TestMarshalArrayWithDynamicLength(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, []byte("003ABCDDE\r"), data)
 }
+*/
