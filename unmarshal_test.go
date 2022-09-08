@@ -18,12 +18,14 @@ type TestBinaryStructure1 struct {
 	Dummy               string `bin:":4,trim"` // 26
 	BlockIdentification string `bin:":1,trim"` // 30
 
-	TestResults []struct {
-		TestCode   string `bin:":2"`            // 1. 30  2. 43
-		TestResult string `bin:":9,trim"`       // 1. 32  2. 45
-		Flags      string `bin:":2,trim"`       // 1. 41  2. 54
-		Terminator string `bin:":1,terminator"` // 1.     2. 56
-	}
+	TestResults []TestResultsStructure
+}
+
+type TestResultsStructure struct {
+	TestCode   string `bin:":2"`            // 1. 30  2. 43
+	TestResult string `bin:":9,trim"`       // 1. 32  2. 45
+	Flags      string `bin:":2,trim"`       // 1. 41  2. 54
+	Terminator string `bin:":1,terminator"` // 1.     2. 56
 }
 
 // POC Unmarshal binary protocol generic simple example
@@ -160,7 +162,7 @@ type testUnannotated struct {
 	UnannotatedFloat64Field    float64
 }
 
-//TEST: bug: unannotated fields in struct did cause an error.
+// TEST: bug: unannotated fields in struct did cause an error.
 // Unannotated fields should just be skipped
 func TestUnanotatedFieldsAreSkipped(t *testing.T) {
 	data := "1234567"
@@ -192,6 +194,9 @@ func TestInaccesibleFields(t *testing.T) {
 
 	var r testUnaccisbleFields
 	err := Unmarshal([]byte(data), &r, EncodingUTF8, TimezoneUTC, "")
+
+	// suppress warning
+	_ = r.meIsNotAccessibleWithoutAnnotation
 
 	assert.Nil(t, err)
 	assert.Equal(t, "1", r.MeIsAccessible)

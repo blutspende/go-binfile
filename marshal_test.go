@@ -226,6 +226,43 @@ func TestMarshalSlices(t *testing.T) {
 	assert.Equal(t, "1234\r", string(data))
 }
 
+/*
+func TestMarshalArray(t *testing.T) {
+	r := make([]testGenericMarshal, 0)
+	r = append(r, testGenericMarshal{someField1: "AB", someField2: "CDEF"})
+	r = append(r, testGenericMarshal{someField1: "12", someField2: "3456"})
+
+	data, err := Marshal(r, 'x', EncodingUTF8, TimezoneEuropeBerlin, "\r")
+
+	assert.Nil(t, err)
+	assert.Equal(t, "ABCDEFxx  \r123456xx  \r", data)
+}*/
+
+// --------------------------------------------------------------------------------------------------
+type testGenericMarshal struct {
+	SomeField1      string  `bin:":2"`
+	SomeField2      string  `bin:":4"`
+	SomeField3      string  `bin:"8:2"` // add a "jump" of two charachters to force to fill up
+	IntField        int     `bin:":3"`
+	IntFieldPadding int     `bin:":3,padzero"`
+	DecimalField    float32 `bin:":"`
+}
+
+func TestMarhalGeneric(t *testing.T) {
+
+	var r testGenericMarshal
+	r.SomeField1 = "12"
+	r.SomeField2 = "3456"
+	r.SomeField3 = "aa"
+	r.IntField = 7
+	r.IntFieldPadding = 5
+	data, err := Marshal(r, 'x', EncodingUTF8, TimezoneEuropeBerlin, "\r")
+
+	assert.Nil(t, err)
+
+	assert.Equal(t, "123456xxaa  7005", data)
+}
+
 // --------------------------------------------------------------------------------------------------
 func TestMarshalArray(t *testing.T) {
 	r := make([]testGenericMarshal, 0)
