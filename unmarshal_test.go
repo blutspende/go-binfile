@@ -18,12 +18,14 @@ type TestBinaryStructure1 struct {
 	Dummy               string `bin:":4,trim"` // 26
 	BlockIdentification string `bin:":1,trim"` // 30
 
-	TestResults []struct {
-		TestCode   string `bin:":2"`            // 1. 30  2. 43
-		TestResult string `bin:":9,trim"`       // 1. 32  2. 45
-		Flags      string `bin:":2,trim"`       // 1. 41  2. 54
-		Terminator string `bin:":1,terminator"` // 1.     2. 56
-	}
+	TestResults []TestResultsStructure
+}
+
+type TestResultsStructure struct {
+	TestCode   string `bin:":2"`            // 1. 30  2. 43
+	TestResult string `bin:":9,trim"`       // 1. 32  2. 45
+	Flags      string `bin:":2,trim"`       // 1. 41  2. 54
+	Terminator string `bin:":1,terminator"` // 1.     2. 56
 }
 
 // POC Unmarshal binary protocol generic simple example
@@ -135,10 +137,11 @@ func TestExpectInvalidAddressAnnotationToFail(t *testing.T) {
 type absoluteAddressing struct {
 	Field1 string `bin:"0:2"`
 	Field2 string `bin:"5:2"`
+	Field3 string `bin:":2"`
 }
 
 func TestAbsoluteAddressing(t *testing.T) {
-	data := "01xxx56xxx"
+	data := "01xxx56abxxx"
 
 	var r absoluteAddressing
 	err := Unmarshal([]byte(data), &r, EncodingUTF8, TimezoneUTC, "\r")
@@ -147,6 +150,7 @@ func TestAbsoluteAddressing(t *testing.T) {
 
 	assert.Equal(t, "01", r.Field1)
 	assert.Equal(t, "56", r.Field2)
+	assert.Equal(t, "ab", r.Field3)
 }
 
 type testUnannotated struct {
@@ -158,7 +162,7 @@ type testUnannotated struct {
 	UnannotatedFloat64Field    float64
 }
 
-//TEST: bug: unannotated fields in struct did cause an error.
+// TEST: bug: unannotated fields in struct did cause an error.
 // Unannotated fields should just be skipped
 func TestUnanotatedFieldsAreSkipped(t *testing.T) {
 	data := "1234567"
@@ -191,15 +195,20 @@ func TestInaccesibleFields(t *testing.T) {
 	var r testUnaccisbleFields
 	err := Unmarshal([]byte(data), &r, EncodingUTF8, TimezoneUTC, "")
 
+	// suppress warning
+	_ = r.meIsNotAccessibleWithoutAnnotation
+
 	assert.Nil(t, err)
 	assert.Equal(t, "1", r.MeIsAccessible)
 }
 
+/*
 type nested struct {
 	Field1 string `bin:":1"`
 	Field2 string `bin:":2"`
 	Field3 string `bin:"3:1,terminator"`
 }
+
 
 // TEST: top class is an array
 func TestTopIsAnArray(t *testing.T) {
@@ -212,3 +221,4 @@ func TestTopIsAnArray(t *testing.T) {
 
 	assert.Equal(t, 3, len(r))
 }
+*/
