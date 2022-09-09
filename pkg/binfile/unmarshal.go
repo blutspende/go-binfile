@@ -94,26 +94,17 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 		_ = hasAnnotations
 
 		absoluteAnnotatedPos, relativeAnnotatedLength, hasAnnotatedAddress, err := getAddressAnnotation(annotationList)
-		_ = hasAnnotatedAddress
 		if err != nil {
 			return currentByte, fmt.Errorf("invalid address annotation field '%s' `%s`: %w", record.Type().Field(fieldNo).Name, binTag, err)
 		}
 
-		hasTrimAnnotation := false
-		if sliceContainsString(annotationList, ANNOTATION_TRIM) {
-			hasTrimAnnotation = true
-		}
-		hasTerminatorAnnotation := false
-		if sliceContainsString(annotationList, ANNOTATION_TERMINATOR) {
-			hasTerminatorAnnotation = true
-			if reflect.TypeOf(recordField.Interface()).Kind() != reflect.String {
-				return currentByte, fmt.Errorf("array-terminator fields must be string ('%s')", record.Type().Field(fieldNo).Name)
-			}
-		}
-
-		if absoluteAnnotatedPos > 0 {
+		if hasAnnotatedAddress && absoluteAnnotatedPos > 0 {
 			// The current field has an absolute Address. This causes the cursor to be forwarded
-			currentByte = initialStartByte + absoluteAnnotatedPos
+			var newPos = initialStartByte + absoluteAnnotatedPos
+			if len(inputBytes)-initialStartByte < newPos {
+				return currentByte, fmt.Errorf("absolute position points out-of-bounds on field '%s' `%s`", record.Type().Field(fieldNo).Name, binTag)
+			}
+			currentByte = newPos
 		}
 
 		if relativeAnnotatedLength > 0 {
@@ -131,47 +122,9 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 			record.Type().Field(fieldNo).Name,
 			absoluteAnnotatedPos, relativeAnnotatedLength, currentByte)
 
-		if !recordField.CanInterface() {
-			continue // field is not accessible
-		}
+		var valueKind = reflect.TypeOf(recordField.Interface()).Kind()
 
-		switch reflect.TypeOf(recordField.Interface()).Kind() {
-		case reflect.Slice:
-			switch reflect.TypeOf(recordField.Type()).Elem().Kind() { // Nested: all here is an array of something
-			case reflect.Struct:
-
-				targetType := recordField.Type()
-
-				output := reflect.MakeSlice(targetType, 0, 0)
-				recordField.Set(output)
-
-				for {
-					outputTarget := reflect.New(targetType.Elem())
-					lastByte := currentByte
-					var err error
-					currentByte, err = internalUnmarshal(inputBytes, currentByte, outputTarget.Elem(), arrayTerminator, depth+1, enc, tz)
-
-					if lastByte == currentByte { // we didnt progess a single byte
-						break
-					}
-
-					output = reflect.Append(output, outputTarget.Elem())
-					recordField.Set(output)
-
-					if err == ErrAbortArrayTerminator {
-						break // terminate because the annotated terminator-field was set
-					}
-
-					if currentByte >= len(inputBytes) { // read to an end = peaceful exit
-						break // read further than the end
-					}
-				}
-
-			default:
-				return currentByte, fmt.Errorf("arrays of type '%s' are not supported (field '%s')", record.Type().Name(), record.Type().Field(fieldNo).Name)
-			}
-
-		case reflect.Struct:
+		if valueKind == reflect.Struct {
 
 			var err error
 			currentByte, err = internalUnmarshal(inputBytes, currentByte, recordField, arrayTerminator, depth+1, enc, tz)
@@ -179,22 +132,116 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 				return currentByte, err
 			}
 
-		case reflect.String:
+			continue
+		}
 
-			if binTag == "" {
-				continue // Do not process unannotated fields
+		if !hasAnnotations {
+			continue // Do not process unannotated fields
+		}
+
+		if valueKind == reflect.Slice {
+
+			var arrayAnnotation, hasArrayAnnotation = getArrayAnnotation(annotationList)
+			if !hasArrayAnnotation {
+				return currentByte, fmt.Errorf("error processing field '%s' `%s`: %w", record.Type().Field(fieldNo).Name, binTag, fmt.Errorf("array fields must have an array annotation"))
 			}
 
-			if relativeAnnotatedLength < 0 { // Requires a valid length
-				return currentByte, fmt.Errorf("invalid address annotation field '%s' `%s`", record.Type().Field(fieldNo).Name, binTag)
+			var targetKind = reflect.TypeOf(recordField.Type()).Elem().Kind()
+			if targetKind != reflect.Struct && !hasAnnotatedAddress {
+				return currentByte, fmt.Errorf("error processing field '%s' `%s`: %w", record.Type().Field(fieldNo).Name, binTag, fmt.Errorf("non-struct field must have address annotation"))
 			}
 
-			if !recordField.CanSet() {
-				return currentByte, ErrAnnotatedFieldNotWritable
+			var arraySize = -1
+			var isTerminatorType = isArrayTypeTerminator(arrayAnnotation)
+			if !isTerminatorType {
+				if size, isFixedSize := getArrayFixedSize(arrayAnnotation); isFixedSize {
+					arraySize = size
+				} else if fieldName, isDynamic := getArraySizeFieldName(arrayAnnotation); isDynamic {
+					_ = fieldName // TODO: find size by field name or error
+				}
 			}
 
-			strvalue := string(inputBytes[currentByte : currentByte+relativeAnnotatedLength])
+			var targetType = recordField.Type()
+			var err error
 
+			var outputSlice = reflect.MakeSlice(targetType, 0, 0)
+			recordField.Set(outputSlice)
+
+			var arrayIdx = -1
+			for {
+				arrayIdx++
+				if !isTerminatorType {
+					if arrayIdx == arraySize {
+						break
+					}
+				}
+
+				var outputTarget = reflect.New(targetType.Elem())
+				var lastByte = currentByte
+
+				switch targetKind { // Nested: all here is an array of something
+				case reflect.Struct:
+
+					currentByte, err = internalUnmarshal(inputBytes, currentByte, outputTarget.Elem(), arrayTerminator, depth+1, enc, tz)
+					if err != nil {
+						return currentByte, err
+					}
+
+				default:
+					return currentByte, fmt.Errorf("arrays of type '%s' are not supported (field '%s')", record.Type().Name(), record.Type().Field(fieldNo).Name)
+				}
+
+				if lastByte == currentByte { // we didnt progess a single byte
+					break
+				}
+
+				outputSlice = reflect.Append(outputSlice, outputTarget.Elem())
+				recordField.Set(outputSlice)
+
+				if isTerminatorType {
+					// check if next bytes are a terminator
+					var strvalue = string(inputBytes[currentByte : currentByte+len(arrayTerminator)])
+					if strvalue == arrayTerminator {
+						currentByte = currentByte + len(arrayTerminator)
+						break
+					}
+				}
+
+				if currentByte >= len(inputBytes) { // read to an end = peaceful exit
+					break // read further than the end
+				}
+			}
+
+			continue
+		}
+
+		if !hasAnnotatedAddress {
+			return currentByte, fmt.Errorf("error processing field '%s' `%s`: %w", record.Type().Field(fieldNo).Name, binTag, fmt.Errorf("non-struct field must have address annotation"))
+		}
+
+		// TODO
+		currentByte, err = unmarshalSimpleTypes(inputBytes, currentByte, recordField, relativeAnnotatedLength, annotationList, arrayTerminator, depth+1, enc, tz)
+		if err != nil {
+			return currentByte, fmt.Errorf("error processing field '%s' `%s`: %w", record.Type().Field(fieldNo).Name, binTag, err)
+		}
+
+	}
+
+	return currentByte, nil
+}
+
+func unmarshalSimpleTypes(inputBytes []byte, currentByte int, recordField reflect.Value, relativeAnnotatedLength int, annotationList []string, arrayTerminator string, depth int, enc Encoding, tz Timezone) (int, error) {
+
+	var valueKind = reflect.TypeOf(recordField.Interface()).Kind()
+	switch valueKind {
+	case reflect.String:
+
+		if !recordField.CanSet() {
+			return currentByte, ErrAnnotatedFieldNotWritable
+		}
+
+		strvalue := string(inputBytes[currentByte : currentByte+relativeAnnotatedLength])
+		/*
 			if hasTerminatorAnnotation {
 				if strvalue == arrayTerminator {
 					reflect.ValueOf(recordField.Addr().Interface()).Elem().SetString(reflect.ValueOf(arrayTerminator).String())
@@ -204,82 +251,57 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 				}
 				break
 			}
+		*/
+		currentByte += relativeAnnotatedLength
 
-			currentByte += relativeAnnotatedLength
-			if hasTrimAnnotation {
-				strvalue = strings.TrimSpace(strvalue)
-			}
-
-			reflect.ValueOf(recordField.Addr().Interface()).Elem().SetString(reflect.ValueOf(strvalue).String())
-
-		case reflect.Int:
-
-			if binTag == "" {
-				continue // Do not process unannotated fields
-			}
-
-			if relativeAnnotatedLength < 0 { // Requires a valid length
-				return currentByte, fmt.Errorf("invalid address annotation field '%s' `%s`", record.Type().Field(fieldNo).Name, binTag)
-			}
-
-			strvalue := string(inputBytes[currentByte : currentByte+relativeAnnotatedLength])
-			currentByte += relativeAnnotatedLength
-
+		if sliceContainsString(annotationList, ANNOTATION_TRIM) {
 			strvalue = strings.TrimSpace(strvalue)
-
-			num, err := strconv.Atoi(strvalue)
-			if err != nil {
-				return currentByte, err
-			}
-
-			reflect.ValueOf(recordField.Addr().Interface()).Elem().Set(reflect.ValueOf(num))
-
-		case reflect.Float32:
-
-			if binTag == "" {
-				continue // Do not process unannotated fields
-			}
-
-			if relativeAnnotatedLength < 0 { // Requires a valid length
-				return currentByte, fmt.Errorf("invalid address annotation field '%s' `%s`", record.Type().Field(fieldNo).Name, binTag)
-			}
-
-			value := string(inputBytes[currentByte : currentByte+relativeAnnotatedLength])
-			currentByte += relativeAnnotatedLength
-			strvalue := strings.TrimSpace(value)
-			num, err := strconv.ParseFloat(strvalue, 32)
-			if err != nil {
-				return currentByte, err
-			}
-
-			reflect.ValueOf(recordField.Addr().Interface()).Elem().Set(reflect.ValueOf(float32(num)))
-
-		case reflect.Float64:
-
-			if binTag == "" {
-				continue // Do not process unannotated fields
-			}
-
-			if relativeAnnotatedLength < 0 { // Requires a valid length
-				return currentByte, fmt.Errorf("invalid address annotation field '%s' `%s`", record.Type().Field(fieldNo).Name, binTag)
-			}
-
-			value := string(inputBytes[currentByte : currentByte+relativeAnnotatedLength])
-			currentByte += relativeAnnotatedLength
-			strvalue := strings.TrimSpace(value)
-			num, err := strconv.ParseFloat(strvalue, 64)
-			if err != nil {
-				return currentByte, err
-			}
-
-			reflect.ValueOf(recordField.Addr().Interface()).Elem().Set(reflect.ValueOf(float32(num)))
-
-		default:
-
-			if binTag != "" { // only if annotated this wil create an error
-				return currentByte, fmt.Errorf("invalid type for field %s", record.Type().Field(fieldNo).Name)
-			}
 		}
+
+		reflect.ValueOf(recordField.Addr().Interface()).Elem().SetString(reflect.ValueOf(strvalue).String())
+
+	case reflect.Int:
+
+		strvalue := string(inputBytes[currentByte : currentByte+relativeAnnotatedLength])
+		currentByte += relativeAnnotatedLength
+
+		strvalue = strings.TrimSpace(strvalue)
+
+		num, err := strconv.Atoi(strvalue)
+		if err != nil {
+			return currentByte, err
+		}
+
+		reflect.ValueOf(recordField.Addr().Interface()).Elem().Set(reflect.ValueOf(num))
+
+	case reflect.Float32:
+
+		value := string(inputBytes[currentByte : currentByte+relativeAnnotatedLength])
+		currentByte += relativeAnnotatedLength
+		strvalue := strings.TrimSpace(value)
+		num, err := strconv.ParseFloat(strvalue, 32)
+		if err != nil {
+			return currentByte, err
+		}
+
+		reflect.ValueOf(recordField.Addr().Interface()).Elem().Set(reflect.ValueOf(float32(num)))
+
+	case reflect.Float64:
+
+		value := string(inputBytes[currentByte : currentByte+relativeAnnotatedLength])
+		currentByte += relativeAnnotatedLength
+		strvalue := strings.TrimSpace(value)
+		num, err := strconv.ParseFloat(strvalue, 64)
+		if err != nil {
+			return currentByte, err
+		}
+
+		reflect.ValueOf(recordField.Addr().Interface()).Elem().Set(reflect.ValueOf(float32(num)))
+
+	default:
+
+		return currentByte, fmt.Errorf("unsupported field type '%s'", valueKind)
+
 	}
 
 	return currentByte, nil

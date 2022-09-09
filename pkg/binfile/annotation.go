@@ -51,7 +51,7 @@ func getArrayFixedSize(arrayAnnotation string) (int, bool) {
 		return 0, false
 	}
 
-	if num, err := strconv.Atoi(vals[1]); err == nil {
+	if num, err := strconv.Atoi(vals[1]); err == nil && num > 0 {
 		return num, true
 	}
 

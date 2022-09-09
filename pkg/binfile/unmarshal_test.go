@@ -22,10 +22,10 @@ type TestBinaryStructure1 struct {
 }
 
 type TestResultsStructure struct {
-	TestCode   string `bin:":2"`            // 1. 30  2. 43
-	TestResult string `bin:":9,trim"`       // 1. 32  2. 45
-	Flags      string `bin:":2,trim"`       // 1. 41  2. 54
-	Terminator string `bin:":1,terminator"` // 1.     2. 56
+	TestCode   string `bin:":2"`      // 1. 30  2. 43
+	TestResult string `bin:":9,trim"` // 1. 32  2. 45
+	Flags      string `bin:":2,trim"` // 1. 41  2. 54
+	//	Terminator string `bin:":1,terminator"` // 1.     2. 56
 }
 
 // POC Unmarshal binary protocol generic simple example
@@ -72,6 +72,7 @@ func TestUnmarshalMultipleRecords(t *testing.T) {
 	assert.Equal(t, nil, err)
 
 	assert.Equal(t, 2, len(r.DMessage))
+
 	assert.Equal(t, "D ", r.DMessage[0].RecordType)
 	assert.Equal(t, 3, r.DMessage[0].UnitNo)
 	assert.Equal(t, 1165, r.DMessage[0].RackNumber)
@@ -127,7 +128,7 @@ func TestExpectInvalidAddressAnnotationToFail(t *testing.T) {
 
 	var invalid invalidAddressAnnoation
 	err := Unmarshal([]byte(data), &invalid, EncodingUTF8, TimezoneUTC, "\r")
-	assert.Equal(t, "invalid address annotation field 'FieldInvalid' `-1:`", err.Error())
+	assert.Equal(t, "error processing field 'FieldInvalid' `-1:`: non-struct field must have address annotation", err.Error())
 
 	var onlyValid onlyValidAddressAnnotations
 	err = Unmarshal([]byte(data), &onlyValid, EncodingUTF8, TimezoneUTC, "\r")

@@ -135,7 +135,7 @@ func internalMarshal(record reflect.Value, onlyPaddWithZeros bool, padding byte,
 
 				default:
 
-					tempOutByte, currentByte, err = processSimpleTypes(currentElement, onlyPaddWithZeros, relativeAnnotatedLength, padding, currentByte, depth)
+					tempOutByte, currentByte, err = marshalSimpleTypes(currentElement, onlyPaddWithZeros, relativeAnnotatedLength, padding, currentByte, depth)
 					if err != nil {
 						return []byte{}, currentByte, fmt.Errorf("error processing field %s: %w", record.Type().Field(fieldNo).Name, err)
 					}
@@ -160,7 +160,7 @@ func internalMarshal(record reflect.Value, onlyPaddWithZeros bool, padding byte,
 		}
 
 		var tempOutByte []byte
-		tempOutByte, currentByte, err = processSimpleTypes(recordField, onlyPaddWithZeros, relativeAnnotatedLength, padding, currentByte, depth)
+		tempOutByte, currentByte, err = marshalSimpleTypes(recordField, onlyPaddWithZeros, relativeAnnotatedLength, padding, currentByte, depth)
 		if err != nil {
 			return []byte{}, currentByte, fmt.Errorf("error processing field '%s' `%s`: %w", record.Type().Field(fieldNo).Name, binTag, err)
 		}
@@ -171,7 +171,7 @@ func internalMarshal(record reflect.Value, onlyPaddWithZeros bool, padding byte,
 	return outBytes, currentByte, nil
 }
 
-func processSimpleTypes(recordField reflect.Value, onlyPaddWithZeros bool, relativeAnnotatedLength int, padding byte, currentByte int, depth int) ([]byte, int, error) {
+func marshalSimpleTypes(recordField reflect.Value, onlyPaddWithZeros bool, relativeAnnotatedLength int, padding byte, currentByte int, depth int) ([]byte, int, error) {
 
 	if onlyPaddWithZeros {
 		return make([]byte, relativeAnnotatedLength), currentByte + relativeAnnotatedLength, nil
