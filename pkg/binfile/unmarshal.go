@@ -2,9 +2,7 @@ package binfile
 
 import (
 	"fmt"
-	"log"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -98,7 +96,7 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 			if !isValidAddressAnnotation(binTagsList[0]) && binTagsList[0] != "" && binTag != "" {
 				return currentByte, fmt.Errorf("invalid address annotation field '%s' `%s`", record.Type().Field(fieldNo).Name, binTag)
 			}
-			absoluteAnnotatedPos, relativeAnnotatedLength = readAddressAnnotation(binTagsList[0])
+			absoluteAnnotatedPos, relativeAnnotatedLength, _ = readAddressAnnotation(binTagsList[0])
 		}
 		hasTrimAnnotation := false
 		if sliceContainsString(binTagsList, ANNOTATION_TRIM) {
@@ -285,42 +283,6 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 	}
 
 	return currentByte, nil
-}
-
-// isValidAddressAnnotation - verify the valdity of an address annotation
-// returns
-//  - true when the string matches [0-9]*:[0-9]+
-//  - false otherwise
-func isValidAddressAnnotation(str string) bool {
-	expr, err := regexp.Compile("[0-9]*:[0-9]+")
-	if err != nil {
-		log.Panic("Invalid Expression in regexp (this error should never occur)")
-		return false
-	}
-	matched := expr.Match([]byte(str))
-	return matched
-}
-
-// read an address annotation with format "absolute:length" or ":length"
-func readAddressAnnotation(str string) (int, int) {
-	abs := -1
-	length := -1
-
-	parts := strings.Split(str, ":")
-
-	if len(parts) >= 1 { // the 1st part is the absolute address
-		if parts[0] != "" {
-			abs, _ = strconv.Atoi(parts[0])
-		}
-	}
-
-	if len(parts) >= 2 { // the 2nd part is the length of the field
-		if parts[1] != "" {
-			length, _ = strconv.Atoi(parts[1])
-		}
-	}
-
-	return abs, length
 }
 
 // find a searchstring within an array of strings. only matches full
