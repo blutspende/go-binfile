@@ -75,35 +75,36 @@ func Unmarshal(inputBytes []byte, target interface{}, enc Encoding, tz Timezone,
 // use this for recursion
 func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value, arrayTerminator string, depth int, enc Encoding, tz Timezone) (int, error) {
 
-	initialStartByte := currentByte
+	var initialStartByte = currentByte
 
 	for fieldNo := 0; fieldNo < record.NumField(); fieldNo++ {
 
-		recordField := record.Field(fieldNo)
+		var recordField = record.Field(fieldNo)
 
-		binTag := record.Type().Field(fieldNo).Tag.Get("bin")
-		if binTag != "" && !recordField.CanInterface() {
-			return currentByte, fmt.Errorf("field '%s' is not exported but annotated", record.Type().Field(fieldNo).Name)
-		}
-
-		binTagsList := strings.Split(binTag, ",")
-		for i := 0; i < len(binTagsList); i++ {
-			binTagsList[i] = strings.Trim(binTagsList[i], " ")
-		}
-		absoluteAnnotatedPos := -1
-		relativeAnnotatedLength := -1
-		if len(binTagsList) >= 1 {
-			if !isValidAddressAnnotation(binTagsList[0]) && binTagsList[0] != "" && binTag != "" {
-				return currentByte, fmt.Errorf("invalid address annotation field '%s' `%s`", record.Type().Field(fieldNo).Name, binTag)
+		var binTag = record.Type().Field(fieldNo).Tag.Get("bin")
+		if !recordField.CanInterface() {
+			if binTag != "" {
+				return currentByte, fmt.Errorf("field '%s' is not exported but annotated", record.Type().Field(fieldNo).Name)
+			} else {
+				continue // TODO: this won't notify you about accidentally not exported nested structs
 			}
-			absoluteAnnotatedPos, relativeAnnotatedLength, _ = readAddressAnnotation(binTagsList[0])
 		}
+
+		var annotationList, hasAnnotations = getAnnotationList(binTag)
+		_ = hasAnnotations
+
+		absoluteAnnotatedPos, relativeAnnotatedLength, hasAnnotatedAddress, err := getAddressAnnotation(annotationList)
+		_ = hasAnnotatedAddress
+		if err != nil {
+			return currentByte, fmt.Errorf("invalid address annotation field '%s' `%s`: %w", record.Type().Field(fieldNo).Name, binTag, err)
+		}
+
 		hasTrimAnnotation := false
-		if sliceContainsString(binTagsList, ANNOTATION_TRIM) {
+		if sliceContainsString(annotationList, ANNOTATION_TRIM) {
 			hasTrimAnnotation = true
 		}
 		hasTerminatorAnnotation := false
-		if sliceContainsString(binTagsList, ANNOTATION_TERMINATOR) {
+		if sliceContainsString(annotationList, ANNOTATION_TERMINATOR) {
 			hasTerminatorAnnotation = true
 			if reflect.TypeOf(recordField.Interface()).Kind() != reflect.String {
 				return currentByte, fmt.Errorf("array-terminator fields must be string ('%s')", record.Type().Field(fieldNo).Name)
@@ -122,14 +123,13 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 			}
 		}
 
-		/* Really useful debugging:
+		// Really useful debugging:
 		for k := 0; k < depth; k++ {
 			fmt.Print(" ")
 		}
 		fmt.Printf("Field %s (%d:%d) with at %d \n",
 			record.Type().Field(fieldNo).Name,
 			absoluteAnnotatedPos, relativeAnnotatedLength, currentByte)
-		*/
 
 		if !recordField.CanInterface() {
 			continue // field is not accessible
