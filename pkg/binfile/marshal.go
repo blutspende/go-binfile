@@ -61,13 +61,13 @@ func internalMarshal(record reflect.Value, onlyPaddWithZeros bool, padding byte,
 				return []byte{}, currentByte, fmt.Errorf("absoulute position is bigger then the current '%s' `%s`", record.Type().Field(fieldNo).Name, binTag)
 			}
 		}
-
-		for k := 0; k < depth; k++ {
-			fmt.Print(" ")
-		}
-		fmt.Printf("Field %s (%d:%d) with at %d \n",
-			record.Type().Field(fieldNo).Name,
-			absoluteAnnotatedPos, relativeAnnotatedLength, currentByte)
+		/*
+			for k := 0; k < depth; k++ {
+				fmt.Print(" ")
+			}
+			fmt.Printf("Field %s (%d:%d) with at %d \n",
+				record.Type().Field(fieldNo).Name,
+				absoluteAnnotatedPos, relativeAnnotatedLength, currentByte)*/
 
 		var valueKind = reflect.TypeOf(recordField.Interface()).Kind()
 		if valueKind == reflect.Struct {

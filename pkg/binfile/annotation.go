@@ -11,8 +11,14 @@ func getAnnotationList(tag string) ([]string, bool) {
 
 	tag = strings.Replace(tag, " ", "", -1)
 	var annotations = strings.Split(tag, ",")
+	var annotationsFiltered []string
+	for i, _ := range annotations {
+		if len(annotations[i]) > 0 {
+			annotationsFiltered = append(annotationsFiltered, annotations[i])
+		}
+	}
 
-	return annotations, len(annotations) > 0
+	return annotationsFiltered, len(annotationsFiltered) > 0
 }
 
 func getArrayAnnotation(annotationList []string) (string, bool) {
