@@ -309,10 +309,7 @@ func TestMarshalArrayWithFixedLength(t *testing.T) {
 	data, err := Marshal(FixedLenArray4Elements, 'x', EncodingUTF8, TimezoneEuropeBerlin, "")
 	assert.Nil(t, err)
 
-	var result = []byte("N1N2N3N4")
-	result = append(result, []byte{0, 0}...)
-	result = append(result, []byte("1")...)
-	result = append(result, []byte{0, 0}...)
+	var result = []byte("N1N2N3N4\x00\x001\x00\x00")
 
 	assert.Equal(t, result, data)
 
@@ -349,28 +346,3 @@ func TestMarshalArrayWithDynamicLength(t *testing.T) {
 	assert.Equal(t, []byte("003ABCDDE\r"), data)
 }
 */
-
-type TTT struct {
-	ID         string   `json:"id" db:"id"`
-	RecordType string   `json:"recordType" bin:":2"`
-	RackNumber int      `json:"rackNumber" bin:":4"`
-	BlockId    string   `json:"blockId" bin:":1"`
-	TestCodes  []string `json:"TestCode" bin:"array:terminator,:2"`
-}
-
-func TestTTT(t *testing.T) {
-	var ez TTT
-	ez.RecordType = "dd"
-	ez.RackNumber = 300
-	ez.BlockId = "d"
-	ez.TestCodes = []string{
-		"ha", "ha", "ha",
-	}
-
-	// padding zeros for a required length of 5
-	data, err := Marshal(ez, 'x', EncodingUTF8, TimezoneEuropeBerlin, "_")
-	assert.Nil(t, err)
-
-	assert.Equal(t, []byte("dd0300dhahaha_"), data)
-
-}

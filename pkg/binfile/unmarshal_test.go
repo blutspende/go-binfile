@@ -1,6 +1,7 @@
 package binfile
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/google/uuid"
@@ -201,6 +202,68 @@ func TestInaccesibleFields(t *testing.T) {
 
 	assert.Nil(t, err)
 	assert.Equal(t, "1", r.MeIsAccessible)
+}
+
+type testInnerArrayUnmarshal struct {
+	JustAField string `bin:":2"`
+	AndAnOther int    `bin:":1"`
+}
+type testFixedLengthArrayUnmarshal struct {
+	StructSlice    []testInnerArrayUnmarshal `bin:"array:3"`
+	PrimitiveSlice []int                     `bin:"array:4,:1"`
+}
+
+func TestUnmarshalArrayWithFixedLength(t *testing.T) {
+
+	var dataExactSize = "AA0BB1CC20123"
+
+	var readExactSize testFixedLengthArrayUnmarshal
+	err := Unmarshal([]byte(dataExactSize), &readExactSize, EncodingUTF8, TimezoneUTC, "")
+	assert.Nil(t, err)
+
+	var expectedExactSizeInner = []testInnerArrayUnmarshal{
+		{JustAField: "AA", AndAnOther: 0},
+		{JustAField: "BB", AndAnOther: 1},
+		{JustAField: "CC", AndAnOther: 2},
+	}
+	assert.Equal(t, 3, len(readExactSize.StructSlice))
+	assert.Equal(t, reflect.DeepEqual(readExactSize.StructSlice, expectedExactSizeInner), true)
+	assert.Equal(t, 4, len(readExactSize.PrimitiveSlice))
+	assert.Equal(t, reflect.DeepEqual(readExactSize.PrimitiveSlice, []int{0, 1, 2, 3}), true)
+
+	//-Zero Padded-------------------------------------------------------------
+	var dataZeroPadded = "AA0BB1\x00\x00\x0001\x00\x00"
+
+	var readZeroPadded testFixedLengthArrayUnmarshal
+	err = Unmarshal([]byte(dataZeroPadded), &readZeroPadded, EncodingUTF8, TimezoneUTC, "")
+	assert.Nil(t, err)
+
+	var expectedZeroPaddedInner = []testInnerArrayUnmarshal{
+		{JustAField: "AA", AndAnOther: 0},
+		{JustAField: "BB", AndAnOther: 1},
+	}
+	assert.Equal(t, 2, len(readZeroPadded.StructSlice))
+	assert.Equal(t, reflect.DeepEqual(readZeroPadded.StructSlice, expectedZeroPaddedInner), true)
+	assert.Equal(t, 2, len(readZeroPadded.PrimitiveSlice))
+	assert.Equal(t, reflect.DeepEqual(readZeroPadded.PrimitiveSlice, []int{0, 1}), true)
+
+	//-With Terminator---------------------------------------------------------
+	var dataWithTerminator = "AA0BB1CC2\u000D0123"
+
+	var readWithTerminator testFixedLengthArrayUnmarshal
+	err = Unmarshal([]byte(dataWithTerminator), &readWithTerminator, EncodingUTF8, TimezoneUTC, "\r")
+	assert.Nil(t, err)
+
+	var expectedWithTerminatorInner = []testInnerArrayUnmarshal{
+		{JustAField: "AA", AndAnOther: 0},
+		{JustAField: "BB", AndAnOther: 1},
+		{JustAField: "CC", AndAnOther: 2},
+	}
+	assert.Equal(t, 3, len(readWithTerminator.StructSlice))
+	assert.Equal(t, reflect.DeepEqual(readWithTerminator.StructSlice, expectedWithTerminatorInner), true)
+	assert.Equal(t, 4, len(readWithTerminator.PrimitiveSlice))
+	assert.Equal(t, reflect.DeepEqual(readWithTerminator.PrimitiveSlice, []int{0, 1, 2, 3}), true)
+
 }
 
 /*

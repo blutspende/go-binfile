@@ -12,7 +12,7 @@ func getAnnotationList(tag string) ([]string, bool) {
 	tag = strings.Replace(tag, " ", "", -1)
 	var annotations = strings.Split(tag, ",")
 	var annotationsFiltered []string
-	for i, _ := range annotations {
+	for i := range annotations {
 		if len(annotations[i]) > 0 {
 			annotationsFiltered = append(annotationsFiltered, annotations[i])
 		}
