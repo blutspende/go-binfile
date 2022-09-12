@@ -152,7 +152,21 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 				if size, isFixedSize := getArrayFixedSize(arrayAnnotation); isFixedSize {
 					arraySize = size
 				} else if fieldName, isDynamic := getArraySizeFieldName(arrayAnnotation); isDynamic {
-					_ = fieldName // TODO: find size by field name or error
+					if fieldVal, isFieldFound := getFieldFromStruct(record, fieldName); isFieldFound {
+						var fieldKind = reflect.TypeOf(fieldVal.Interface()).Kind()
+						if fieldKind != reflect.Int {
+							return currentByte, fmt.Errorf("invalid type for array size field '%s' - should be int", fieldName)
+						}
+						arraySize = int(fieldVal.Int())
+						if int64(arraySize) != fieldVal.Int() {
+							return currentByte, fmt.Errorf("int conversion overflow 32 vs 64 bit system")
+						}
+						if arraySize < 0 {
+							return currentByte, fmt.Errorf("invalid size for array size field '%s'", fieldName)
+						}
+					} else {
+						return currentByte, fmt.Errorf("unknown field name for array size '%s'", fieldName)
+					}
 				}
 			}
 

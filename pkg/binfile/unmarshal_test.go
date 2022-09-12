@@ -266,23 +266,58 @@ func TestUnmarshalArrayWithFixedLength(t *testing.T) {
 
 }
 
-/*
-type nested struct {
-	Field1 string `bin:":1"`
-	Field2 string `bin:":2"`
-	Field3 string `bin:"3:1,terminator"`
+type testDynamicArrayUnmarshalUnknownField struct {
+	NotHere   string `bin:":1"`
+	TheArray1 []int  `bin:"array:Hacaca,:1"`
 }
 
+type testDynamicArrayUnmarshalWrongType struct {
+	Nope      string `bin:":1"`
+	TheArray1 []int  `bin:"array:Nope,:1"`
+}
 
-// TEST: top class is an array
-func TestTopIsAnArray(t *testing.T) {
-	data := "123A456A789A"
+type testDynamicArrayUnmarshalWrongValue struct {
+	IncorrectSize int   `bin:":2"`
+	TheArray1     []int `bin:"array:IncorrectSize,:1"`
+}
 
-	r := make([]nested, 0)
-	err := Unmarshal([]byte(data), &r, EncodingUTF8, TimezoneUTC, "A")
+type testDynamicArrayUnmarshal struct {
+	Nope          string `bin:":1"`
+	CorrectSize   int    `bin:":1"`
+	IncorrectSize int    `bin:":2"`
+	TheArray1     []int  `bin:"array:CorrectSize,:1"`
+}
 
+func TestUnmarshalDynamicArray(t *testing.T) {
+
+	var err error
+
+	var data = "A3-1012"
+	var result testDynamicArrayUnmarshal
+
+	err = Unmarshal([]byte(data), &result, EncodingUTF8, TimezoneUTC, "\r")
 	assert.Nil(t, err)
 
-	assert.Equal(t, 3, len(r))
+	assert.Equal(t, "A", result.Nope)
+	assert.Equal(t, 3, result.CorrectSize)
+	assert.Equal(t, -1, result.IncorrectSize)
+	assert.Equal(t, reflect.DeepEqual(result.TheArray1, []int{0, 1, 2}), true)
+
+	var dataWrongType = "A012"
+	var resultWrongType testDynamicArrayUnmarshalWrongType
+
+	err = Unmarshal([]byte(dataWrongType), &resultWrongType, EncodingUTF8, TimezoneUTC, "\r")
+	assert.EqualError(t, err, "invalid type for array size field 'Nope' - should be int")
+
+	var dataWrongValue = "-1012"
+	var resultWrongValue testDynamicArrayUnmarshalWrongValue
+
+	err = Unmarshal([]byte(dataWrongValue), &resultWrongValue, EncodingUTF8, TimezoneUTC, "\r")
+	assert.EqualError(t, err, "invalid size for array size field 'IncorrectSize'")
+
+	var dataNoField = "A012"
+	var resultNoField testDynamicArrayUnmarshalUnknownField
+
+	err = Unmarshal([]byte(dataNoField), &resultNoField, EncodingUTF8, TimezoneUTC, "")
+	assert.EqualError(t, err, "unknown field name for array size 'Hacaca'")
 }
-*/
