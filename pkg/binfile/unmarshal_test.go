@@ -26,7 +26,6 @@ type TestResultsStructure struct {
 	TestCode   string `bin:":2"`      // 1. 30  2. 43
 	TestResult string `bin:":9,trim"` // 1. 32  2. 45
 	Flags      string `bin:":2,trim"` // 1. 41  2. 54
-	//	Terminator string `bin:":1,terminator"` // 1.     2. 56
 }
 
 // POC Unmarshal binary protocol generic simple example
@@ -263,7 +262,6 @@ func TestUnmarshalArrayWithFixedLength(t *testing.T) {
 	assert.Equal(t, reflect.DeepEqual(readWithTerminator.StructSlice, expectedWithTerminatorInner), true)
 	assert.Equal(t, 4, len(readWithTerminator.PrimitiveSlice))
 	assert.Equal(t, reflect.DeepEqual(readWithTerminator.PrimitiveSlice, []int{0, 1, 2, 3}), true)
-
 }
 
 type testDynamicArrayUnmarshalUnknownField struct {

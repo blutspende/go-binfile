@@ -152,6 +152,7 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 				if size, isFixedSize := getArrayFixedSize(arrayAnnotation); isFixedSize {
 					arraySize = size
 				} else if fieldName, isDynamic := getArraySizeFieldName(arrayAnnotation); isDynamic {
+					// TOOD: this will only work if referenced field is already processed but won't give error otherwise
 					if fieldVal, isFieldFound := getFieldFromStruct(record, fieldName); isFieldFound {
 						var fieldKind = reflect.TypeOf(fieldVal.Interface()).Kind()
 						if fieldKind != reflect.Int {
