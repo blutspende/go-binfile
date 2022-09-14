@@ -8,11 +8,6 @@ import (
 	"strings"
 )
 
-const (
-	ANNOTATION_TRIM       = "trim"       // Trim the result (only for string)
-	ANNOTATION_TERMINATOR = "terminator" // Annotate an indicator for ends fo lists (typically sth like CR or CRLF)
-)
-
 var ErrAbortArrayTerminator = fmt.Errorf("aborting due to array-terminator found")
 
 // var ErrInvalidAddressAnnotation = fmt.Errorf("invalid address annotation")
@@ -152,21 +147,9 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 				if size, isFixedSize := getArrayFixedSize(arrayAnnotation); isFixedSize {
 					arraySize = size
 				} else if fieldName, isDynamic := getArraySizeFieldName(arrayAnnotation); isDynamic {
-					// TOOD: this will only work if referenced field is already processed but won't give error otherwise
-					if fieldVal, isFieldFound := getFieldFromStruct(record, fieldName); isFieldFound {
-						var fieldKind = reflect.TypeOf(fieldVal.Interface()).Kind()
-						if fieldKind != reflect.Int {
-							return currentByte, fmt.Errorf("invalid type for array size field '%s' - should be int", fieldName)
-						}
-						arraySize = int(fieldVal.Int())
-						if int64(arraySize) != fieldVal.Int() {
-							return currentByte, fmt.Errorf("int conversion overflow 32 vs 64 bit system")
-						}
-						if arraySize < 0 {
-							return currentByte, fmt.Errorf("invalid size for array size field '%s'", fieldName)
-						}
-					} else {
-						return currentByte, fmt.Errorf("unknown field name for array size '%s'", fieldName)
+					arraySize, err = resolveDynamicArraySize(record, fieldName)
+					if err != nil {
+						return currentByte, err
 					}
 				}
 			}
@@ -277,7 +260,7 @@ func unmarshalSimpleTypes(inputBytes []byte, currentByte int, recordField reflec
 		strvalue := string(inputBytes[currentByte : currentByte+relativeAnnotatedLength])
 		currentByte += relativeAnnotatedLength
 
-		if sliceContainsString(annotationList, ANNOTATION_TRIM) {
+		if hasAnnotationTrim(annotationList) {
 			strvalue = strings.TrimSpace(strvalue)
 		}
 
@@ -328,17 +311,4 @@ func unmarshalSimpleTypes(inputBytes []byte, currentByte int, recordField reflec
 	}
 
 	return currentByte, nil
-}
-
-// find a searchstring within an array of strings. only matches full
-// returns
-//   - true if the string is present
-//   - false otherwise
-func sliceContainsString(list []string, search string) bool {
-	for _, x := range list {
-		if x == search {
-			return true
-		}
-	}
-	return false
 }

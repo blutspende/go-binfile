@@ -58,7 +58,7 @@ func internalMarshal(record reflect.Value, onlyPaddWithZeros bool, padding byte,
 				outBytes = append(outBytes, paddingBytes...)
 				currentByte += len(paddingBytes)
 			} else if currentByte > absoluteAnnotatedPos {
-				return []byte{}, currentByte, fmt.Errorf("absoulute position is bigger then the current '%s' `%s`", record.Type().Field(fieldNo).Name, binTag)
+				return []byte{}, currentByte, fmt.Errorf("absoulute position points backwards '%s' `%s`", record.Type().Field(fieldNo).Name, binTag)
 			}
 		}
 		/*
@@ -108,7 +108,10 @@ func internalMarshal(record reflect.Value, onlyPaddWithZeros bool, padding byte,
 				if size, isFixedSize := getArrayFixedSize(arrayAnnotation); isFixedSize {
 					arraySize = size
 				} else if fieldName, isDynamic := getArraySizeFieldName(arrayAnnotation); isDynamic {
-					_ = fieldName // TODO: find size by field name or error
+					arraySize, err = resolveDynamicArraySize(record, fieldName)
+					if err != nil {
+						return []byte{}, currentByte, err
+					}
 				}
 			}
 

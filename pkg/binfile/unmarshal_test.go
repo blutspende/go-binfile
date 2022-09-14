@@ -8,7 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type TestBinaryStructure1 struct {
+//
+//-General example structure---------------------------------------------------
+
+type testGeneralStructureUnmarshal struct {
 	RecordType          string `bin:":2"`      // 0
 	UnitNo              int    `bin:":2"`      // 2
 	RackNumber          int    `bin:":4"`      // 4
@@ -19,211 +22,368 @@ type TestBinaryStructure1 struct {
 	Dummy               string `bin:":4,trim"` // 26
 	BlockIdentification string `bin:":1,trim"` // 30
 
-	TestResults []TestResultsStructure `bin:"array:terminator"`
+	TestResults []testTestResultStructureUnmarshal `bin:"array:terminator"`
 }
 
-type TestResultsStructure struct {
+type testTestResultStructureUnmarshal struct {
 	TestCode   string `bin:":2"`      // 1. 30  2. 43
 	TestResult string `bin:":9,trim"` // 1. 32  2. 45
 	Flags      string `bin:":2,trim"` // 1. 41  2. 54
 }
 
-// POC Unmarshal binary protocol generic simple example
-func TestUnmarshalBinary1(t *testing.T) {
-	data := "D 03116506 044760722905768    E61     6.40  62      935  "
-	var r TestBinaryStructure1
-	err := Unmarshal([]byte(data), &r, EncodingUTF8, TimezoneUTC, "\r")
+func TestUnmarshalGeneralStructure(t *testing.T) {
+
+	inputData := []byte("D 03116506 044760722905768    E61     6.40  62      935  ")
+
+	var result testGeneralStructureUnmarshal
+	err := Unmarshal(inputData, &result, EncodingUTF8, TimezoneUTC, "\r")
 
 	assert.Nil(t, err)
-	assert.Equal(t, "D ", r.RecordType)
-	assert.Equal(t, 3, r.UnitNo)
-	assert.Equal(t, 1165, r.RackNumber)
-	assert.Equal(t, 6, r.CupPosition)
-	assert.Equal(t, "", r.SampleType)
-	assert.Equal(t, "0447", r.SampleNo)
-	assert.Equal(t, "60722905768", r.SampleId)
-	assert.Equal(t, "", r.Dummy)
-	assert.Equal(t, "E", r.BlockIdentification)
+	assert.Equal(t, "D ", result.RecordType)
+	assert.Equal(t, 3, result.UnitNo)
+	assert.Equal(t, 1165, result.RackNumber)
+	assert.Equal(t, 6, result.CupPosition)
+	assert.Equal(t, "", result.SampleType)
+	assert.Equal(t, "0447", result.SampleNo)
+	assert.Equal(t, "60722905768", result.SampleId)
+	assert.Equal(t, "", result.Dummy)
+	assert.Equal(t, "E", result.BlockIdentification)
 
-	assert.Equal(t, 2, len(r.TestResults))
+	assert.Equal(t, 2, len(result.TestResults))
 
-	assert.Equal(t, "61", r.TestResults[0].TestCode)
-	assert.Equal(t, "6.40", r.TestResults[0].TestResult)
-	assert.Equal(t, "", r.TestResults[0].Flags)
+	assert.Equal(t, "61", result.TestResults[0].TestCode)
+	assert.Equal(t, "6.40", result.TestResults[0].TestResult)
+	assert.Equal(t, "", result.TestResults[0].Flags)
 
-	assert.Equal(t, "62", r.TestResults[1].TestCode)
-	assert.Equal(t, "935", r.TestResults[1].TestResult)
-	assert.Equal(t, "", r.TestResults[1].Flags)
-
+	assert.Equal(t, "62", result.TestResults[1].TestCode)
+	assert.Equal(t, "935", result.TestResults[1].TestResult)
+	assert.Equal(t, "", result.TestResults[1].Flags)
 }
 
-type TestBinaryStructure2 struct {
-	DMessage []TestBinaryStructure1 `bin:"array:terminator"`
+//
+//-Multiple example structure in array-----------------------------------------
+
+type testMultipleRecordsUnmarshal struct {
+	DMessage []testGeneralStructureUnmarshal `bin:"array:terminator"`
 }
 
 // This test inspired by the AU-600 protocol:
 // Read two consecutive Data messages
 func TestUnmarshalMultipleRecords(t *testing.T) {
-	data := "D 03116506 044760722905768    E61     6.40  62      935  \u000DD 03116507 044860722905758    E61     6.86  62      883  "
 
-	var r TestBinaryStructure2
-	err := Unmarshal([]byte(data), &r, EncodingUTF8, TimezoneUTC, "\r")
+	inputData := []byte("D 03116506 044760722905768    E61     6.40  62      935  \u000DD 03116507 044860722905758    E61     6.86  62      883  ")
 
-	assert.Equal(t, nil, err)
-
-	assert.Equal(t, 2, len(r.DMessage))
-
-	assert.Equal(t, "D ", r.DMessage[0].RecordType)
-	assert.Equal(t, 3, r.DMessage[0].UnitNo)
-	assert.Equal(t, 1165, r.DMessage[0].RackNumber)
-	assert.Equal(t, 6, r.DMessage[0].CupPosition)
-	assert.Equal(t, "", r.DMessage[0].SampleType)
-	assert.Equal(t, "0447", r.DMessage[0].SampleNo)
-	assert.Equal(t, "60722905768", r.DMessage[0].SampleId)
-	assert.Equal(t, "", r.DMessage[0].Dummy)
-	assert.Equal(t, "E", r.DMessage[0].BlockIdentification)
-
-	assert.Equal(t, 2, len(r.DMessage[0].TestResults))
-
-	assert.Equal(t, "61", r.DMessage[0].TestResults[0].TestCode)
-	assert.Equal(t, "6.40", r.DMessage[0].TestResults[0].TestResult)
-	assert.Equal(t, "", r.DMessage[0].TestResults[0].Flags)
-
-	assert.Equal(t, "62", r.DMessage[0].TestResults[1].TestCode)
-	assert.Equal(t, "935", r.DMessage[0].TestResults[1].TestResult)
-	assert.Equal(t, "", r.DMessage[0].TestResults[1].Flags)
-
-	//--------------------------- 2nd message block
-	assert.Equal(t, "D ", r.DMessage[1].RecordType)
-	assert.Equal(t, 3, r.DMessage[1].UnitNo)
-	assert.Equal(t, 1165, r.DMessage[1].RackNumber)
-	assert.Equal(t, 7, r.DMessage[1].CupPosition)
-	assert.Equal(t, "", r.DMessage[1].SampleType)
-	assert.Equal(t, "0448", r.DMessage[1].SampleNo)
-	assert.Equal(t, "60722905758", r.DMessage[1].SampleId)
-	assert.Equal(t, "", r.DMessage[1].Dummy)
-	assert.Equal(t, "E", r.DMessage[1].BlockIdentification)
-
-	assert.Equal(t, 2, len(r.DMessage[1].TestResults))
-
-	assert.Equal(t, "61", r.DMessage[1].TestResults[0].TestCode)
-	assert.Equal(t, "6.86", r.DMessage[1].TestResults[0].TestResult)
-	assert.Equal(t, "", r.DMessage[1].TestResults[0].Flags)
-
-	assert.Equal(t, "62", r.DMessage[1].TestResults[1].TestCode)
-	assert.Equal(t, "883", r.DMessage[1].TestResults[1].TestResult)
-	assert.Equal(t, "", r.DMessage[1].TestResults[1].Flags)
-}
-
-type invalidAddressAnnoation struct {
-	FieldInvalid string `bin:"-1:"` // invalid without a length
-}
-
-type onlyValidAddressAnnotations struct {
-	FieldValid string `bin:":2"` // this should pass
-}
-
-func TestExpectInvalidAddressAnnotationToFail(t *testing.T) {
-	data := "123456"
-
-	var invalid invalidAddressAnnoation
-	err := Unmarshal([]byte(data), &invalid, EncodingUTF8, TimezoneUTC, "\r")
-	assert.Equal(t, "error processing field 'FieldInvalid' `-1:`: non-struct field must have address annotation", err.Error())
-
-	var onlyValid onlyValidAddressAnnotations
-	err = Unmarshal([]byte(data), &onlyValid, EncodingUTF8, TimezoneUTC, "\r")
-	assert.Nil(t, err)
-}
-
-type absoluteAddressing struct {
-	Field1 string `bin:"0:2"`
-	Field2 string `bin:"5:2"`
-	Field3 string `bin:":2"`
-}
-
-func TestAbsoluteAddressing(t *testing.T) {
-	data := "01xxx56abxxx"
-
-	var r absoluteAddressing
-	err := Unmarshal([]byte(data), &r, EncodingUTF8, TimezoneUTC, "\r")
+	var result testMultipleRecordsUnmarshal
+	err := Unmarshal(inputData, &result, EncodingUTF8, TimezoneUTC, "\r")
 
 	assert.Equal(t, nil, err)
 
-	assert.Equal(t, "01", r.Field1)
-	assert.Equal(t, "56", r.Field2)
-	assert.Equal(t, "ab", r.Field3)
+	assert.Equal(t, 2, len(result.DMessage))
+
+	assert.Equal(t, "D ", result.DMessage[0].RecordType)
+	assert.Equal(t, 3, result.DMessage[0].UnitNo)
+	assert.Equal(t, 1165, result.DMessage[0].RackNumber)
+	assert.Equal(t, 6, result.DMessage[0].CupPosition)
+	assert.Equal(t, "", result.DMessage[0].SampleType)
+	assert.Equal(t, "0447", result.DMessage[0].SampleNo)
+	assert.Equal(t, "60722905768", result.DMessage[0].SampleId)
+	assert.Equal(t, "", result.DMessage[0].Dummy)
+	assert.Equal(t, "E", result.DMessage[0].BlockIdentification)
+
+	assert.Equal(t, 2, len(result.DMessage[0].TestResults))
+
+	assert.Equal(t, "61", result.DMessage[0].TestResults[0].TestCode)
+	assert.Equal(t, "6.40", result.DMessage[0].TestResults[0].TestResult)
+	assert.Equal(t, "", result.DMessage[0].TestResults[0].Flags)
+
+	assert.Equal(t, "62", result.DMessage[0].TestResults[1].TestCode)
+	assert.Equal(t, "935", result.DMessage[0].TestResults[1].TestResult)
+	assert.Equal(t, "", result.DMessage[0].TestResults[1].Flags)
+
+	//-2nd message block-------------------------------------------------------
+	assert.Equal(t, "D ", result.DMessage[1].RecordType)
+	assert.Equal(t, 3, result.DMessage[1].UnitNo)
+	assert.Equal(t, 1165, result.DMessage[1].RackNumber)
+	assert.Equal(t, 7, result.DMessage[1].CupPosition)
+	assert.Equal(t, "", result.DMessage[1].SampleType)
+	assert.Equal(t, "0448", result.DMessage[1].SampleNo)
+	assert.Equal(t, "60722905758", result.DMessage[1].SampleId)
+	assert.Equal(t, "", result.DMessage[1].Dummy)
+	assert.Equal(t, "E", result.DMessage[1].BlockIdentification)
+
+	assert.Equal(t, 2, len(result.DMessage[1].TestResults))
+
+	assert.Equal(t, "61", result.DMessage[1].TestResults[0].TestCode)
+	assert.Equal(t, "6.86", result.DMessage[1].TestResults[0].TestResult)
+	assert.Equal(t, "", result.DMessage[1].TestResults[0].Flags)
+
+	assert.Equal(t, "62", result.DMessage[1].TestResults[1].TestCode)
+	assert.Equal(t, "883", result.DMessage[1].TestResults[1].TestResult)
+	assert.Equal(t, "", result.DMessage[1].TestResults[1].Flags)
 }
 
-type testUnannotated struct {
-	AnnotatedField             string `bin:":2"`
+//
+//-Top-level Array-------------------------------------------------------------
+/*
+
+
+
+ */
+//
+//-Annotation presence---------------------------------------------------------
+
+type testUnannotatedValidUnmarshal struct {
 	UnannotatedForeignStructre uuid.UUID
 	UnannotatedStringField     string
-	UnannotatedIntField        int
-	UnanntoatedFloat32Field    float32
-	UnannotatedFloat64Field    float64
+	AnnotatedField             string `bin:":2"`
+	unannotatedUnexportedield  int
+	UnannotatedStruct          testUnannotatedValidInnerUnmarshal
 }
 
-// TEST: bug: unannotated fields in struct did cause an error.
-// Unannotated fields should just be skipped
-func TestUnanotatedFieldsAreSkipped(t *testing.T) {
-	data := "1234567"
-
-	var r testUnannotated
-	err := Unmarshal([]byte(data), &r, EncodingUTF8, TimezoneUTC, "")
-
-	assert.Nil(t, err)
-	assert.Equal(t, "12", r.AnnotatedField)
-	assert.Equal(t, "", r.UnannotatedStringField) // Check that it didnt touch our not-annotated field
-	assert.Equal(t, 0, r.UnannotatedIntField)
-	assert.Equal(t, float32(0), r.UnanntoatedFloat32Field)
-	assert.Equal(t, float64(0), r.UnannotatedFloat64Field)
-}
-
-type meArrayElement struct {
-	SomeData string
-}
-
-type testUnaccisbleFields struct {
-	MeIsAccessible                     string `bin:":1"`
-	meIsNotAccessibleWithoutAnnotation string
-	MeArray                            []meArrayElement
-}
-
-// TEST: reprduces a bug that crashed unexported fields
-func TestInaccesibleFields(t *testing.T) {
-	data := "1234567"
-
-	var r testUnaccisbleFields
-	err := Unmarshal([]byte(data), &r, EncodingUTF8, TimezoneUTC, "")
-
-	// suppress warning
-	_ = r.meIsNotAccessibleWithoutAnnotation
-
-	assert.Nil(t, err)
-	assert.Equal(t, "1", r.MeIsAccessible)
-}
-
-type testInnerArrayUnmarshal struct {
+type testUnannotatedValidInnerUnmarshal struct {
 	JustAField string `bin:":2"`
-	AndAnOther int    `bin:":1"`
 }
-type testFixedLengthArrayUnmarshal struct {
-	StructSlice    []testInnerArrayUnmarshal `bin:"array:3"`
-	PrimitiveSlice []int                     `bin:"array:4,:1"`
+
+type testUnannotatedInvalidUnmarshal struct {
+	unexportedAnnotatedField string `bin:":2"`
+}
+
+// TEST: bug: unannotated fields in struct did cause an erroresult.
+// Unannotated fields should just be skipped
+func TestUnmarshalUnanotatedFieldsAreSkipped(t *testing.T) {
+
+	var inputData = []byte("1234")
+	var err error
+
+	var resultValid testUnannotatedValidUnmarshal
+	err = Unmarshal(inputData, &resultValid, EncodingUTF8, TimezoneUTC, "")
+	assert.Nil(t, err)
+
+	// Check that it didnt touch our not-annotated field
+	assert.Equal(t, uuid.UUID{}, resultValid.UnannotatedForeignStructre)
+	assert.Equal(t, "", resultValid.UnannotatedStringField)
+	assert.Equal(t, "12", resultValid.AnnotatedField)
+	assert.Equal(t, 0, resultValid.unannotatedUnexportedield)
+	assert.Equal(t, "34", resultValid.UnannotatedStruct.JustAField)
+
+	//-------------------------------------------------------------------------
+
+	var resultInvalid testUnannotatedInvalidUnmarshal
+	_ = resultInvalid.unexportedAnnotatedField // supress warning
+	err = Unmarshal(inputData, &resultInvalid, EncodingUTF8, TimezoneUTC, "")
+	assert.EqualError(t, err, "field 'unexportedAnnotatedField' is not exported but annotated")
+}
+
+//
+//-Addressing------------------------------------------------------------------
+
+type testInvalidAbsolutePositionUnmarshal struct {
+	Field1       string `bin:":2"`
+	FieldInvalid string `bin:"14:2"` // points out-of-bounds
+}
+
+type testInvalidRelativeLengthOOBUnmarshal struct {
+	FieldInvalid string `bin:":14"` // out-of-bounds read
+}
+
+type testValidAddressingUnmarshal struct {
+	Field1 string `bin:":2"`
+	Field2 string `bin:"0:2"`
+	Field3 string `bin:"7:2"`
+	Field4 string `bin:":2"`
+}
+
+func TestUnmarshalAddressing(t *testing.T) {
+
+	var inputData = []byte("1234xxx5678")
+	var err error
+
+	var resultValid testValidAddressingUnmarshal
+	err = Unmarshal(inputData, &resultValid, EncodingUTF8, TimezoneUTC, "\r")
+	assert.Nil(t, err)
+
+	assert.Equal(t, "12", resultValid.Field1)
+	assert.Equal(t, "34", resultValid.Field2)
+	assert.Equal(t, "56", resultValid.Field3)
+	assert.Equal(t, "78", resultValid.Field4)
+
+	//-------------------------------------------------------------------------
+
+	var resultInvalidAbsolutePos testInvalidAbsolutePositionUnmarshal
+	err = Unmarshal(inputData, &resultInvalidAbsolutePos, EncodingUTF8, TimezoneUTC, "\r")
+	assert.EqualError(t, err, "absolute position points out-of-bounds on field 'FieldInvalid' `14:2`", err.Error())
+
+	//-------------------------------------------------------------------------
+
+	var resultInvalidRelativeLength testInvalidRelativeLengthOOBUnmarshal
+	err = Unmarshal(inputData, &resultInvalidRelativeLength, EncodingUTF8, TimezoneUTC, "\r")
+	assert.EqualError(t, err, "error processing field 'FieldInvalid' `:14`: reading out of bounds position 14 in input data of 11 bytes", err.Error())
+
+}
+
+//
+//-String----------------------------------------------------------------------
+
+type testStringUnmarshal struct {
+	SomeField1 string `bin:":2"`
+	SomeField2 string `bin:":4"`
+	SomeField3 string `bin:"8:2"` // add a "jump" of two charachters to force to fill up
+	SomeField4 string `bin:":4"`
+}
+
+func TestUnmarshalString(t *testing.T) {
+
+	var inputData = []byte("123456xxaa  bb")
+	var err error
+
+	var result testStringUnmarshal
+	err = Unmarshal(inputData, &result, EncodingUTF8, TimezoneUTC, "\r")
+	assert.Nil(t, err)
+
+	assert.Equal(t, "12", result.SomeField1)
+	assert.Equal(t, "3456", result.SomeField2)
+	assert.Equal(t, "aa", result.SomeField3)
+	assert.Equal(t, "  bb", result.SomeField4)
+}
+
+//
+//-Integer---------------------------------------------------------------------
+
+type testIntUnmarshal struct {
+	Length1        int `bin:":2"`
+	Length2        int `bin:":4"`
+	AbsPos         int `bin:"8:2"`
+	Padded         int `bin:":4"`
+	Negative       int `bin:":2"`
+	PaddedNegative int `bin:":4"`
+}
+
+func TestUnmarshalInt(t *testing.T) {
+
+	var inputData = []byte("121234xx120012-2-002")
+	var err error
+
+	var result testIntUnmarshal
+	err = Unmarshal(inputData, &result, EncodingUTF8, TimezoneUTC, "\r")
+	assert.Nil(t, err)
+
+	assert.Equal(t, 12, result.Length1)
+	assert.Equal(t, 1234, result.Length2)
+	assert.Equal(t, 12, result.AbsPos)
+	assert.Equal(t, 12, result.Padded)
+	assert.Equal(t, -2, result.Negative)
+	assert.Equal(t, -2, result.PaddedNegative)
+}
+
+//
+//-Float32 / Float64-----------------------------------------------------------
+
+type testFloatUnmarshal struct {
+	Length1        float32 `bin:":1"`
+	Length2        float32 `bin:":2"`
+	Length3        float32 `bin:":3"`
+	AbsPos         float32 `bin:"8:4"`
+	Padded         float32 `bin:":6"`
+	Negative       float32 `bin:":5"`
+	PaddedNegative float32 `bin:":6"`
+	//BigNum         float64 `bin:":4"` TODO
+}
+
+func TestUnmarshalFloat(t *testing.T) {
+
+	var inputData = []byte("11.1.2xx1.231.2300-1.23-1.2000.00")
+	var err error
+
+	var result testFloatUnmarshal
+	err = Unmarshal(inputData, &result, EncodingUTF8, TimezoneUTC, "\r")
+	assert.Nil(t, err)
+
+	assert.Equal(t, float32(1), result.Length1)
+	assert.Equal(t, float32(1), result.Length2)
+	assert.Equal(t, float32(1.2), result.Length3)
+	assert.Equal(t, float32(1.23), result.AbsPos)
+	assert.Equal(t, float32(1.23), result.Padded)
+	assert.Equal(t, float32(-1.23), result.Negative)
+	assert.Equal(t, float32(-1.2), result.PaddedNegative)
+}
+
+//
+//-Nested Struct---------------------------------------------------------------
+
+type testNestedStructUnmarshal struct {
+	Anything     int `bin:":2"`
+	NestedStruct struct {
+		SomethingNested int `bin:":2"`
+	}
+}
+
+func TestUnmarsalNestedStruct(t *testing.T) {
+
+	var inputData = []byte("0102")
+	var err error
+
+	var result testNestedStructUnmarshal
+	err = Unmarshal(inputData, &result, EncodingUTF8, TimezoneUTC, "\r")
+	assert.Nil(t, err)
+
+	assert.Equal(t, 1, result.Anything)
+	assert.Equal(t, 2, result.NestedStruct.SomethingNested)
+}
+
+//
+//-Terminated Array------------------------------------------------------------
+
+type testArrayUnmarshal struct {
+	MoreElements []testArrayInnerUnmarshal `bin:"array:terminator"`
+	ALotOfInts   []int                     `bin:"array:terminator,:1"`
+}
+
+type testArrayInnerUnmarshal struct {
+	InnerData1 int `bin:":1"`
+	InnerData2 int `bin:":1"`
+}
+
+func TestUnmarshalTerminatedArrays(t *testing.T) {
+
+	var inputData = []byte("1234\r0123\r")
+
+	var result testArrayUnmarshal
+	var err = Unmarshal(inputData, &result, EncodingUTF8, TimezoneUTC, "\r")
+	assert.Nil(t, err)
+
+	assert.Equal(t, 2, len(result.MoreElements))
+	assert.Equal(t, 1, result.MoreElements[0].InnerData1)
+	assert.Equal(t, 2, result.MoreElements[0].InnerData2)
+	assert.Equal(t, 3, result.MoreElements[1].InnerData1)
+	assert.Equal(t, 4, result.MoreElements[1].InnerData2)
+	assert.Equal(t, reflect.DeepEqual(result.ALotOfInts, []int{0, 1, 2, 3}), true)
+}
+
+//
+//-Fixed Size Array------------------------------------------------------------
+
+type testFixedSizeArrayInnerUnmarshal struct {
+	JustAField string `bin:":2"`
+	AndAnother int    `bin:":1"`
+}
+
+type testFixedSizeArrayUnmarshal struct {
+	StructSlice    []testFixedSizeArrayInnerUnmarshal `bin:"array:3"`
+	PrimitiveSlice []int                              `bin:"array:4,:1"`
 }
 
 func TestUnmarshalArrayWithFixedLength(t *testing.T) {
 
 	var dataExactSize = "AA0BB1CC20123"
 
-	var readExactSize testFixedLengthArrayUnmarshal
+	var readExactSize testFixedSizeArrayUnmarshal
 	err := Unmarshal([]byte(dataExactSize), &readExactSize, EncodingUTF8, TimezoneUTC, "")
 	assert.Nil(t, err)
 
-	var expectedExactSizeInner = []testInnerArrayUnmarshal{
-		{JustAField: "AA", AndAnOther: 0},
-		{JustAField: "BB", AndAnOther: 1},
-		{JustAField: "CC", AndAnOther: 2},
+	var expectedExactSizeInner = []testFixedSizeArrayInnerUnmarshal{
+		{JustAField: "AA", AndAnother: 0},
+		{JustAField: "BB", AndAnother: 1},
+		{JustAField: "CC", AndAnother: 2},
 	}
 	assert.Equal(t, 3, len(readExactSize.StructSlice))
 	assert.Equal(t, reflect.DeepEqual(readExactSize.StructSlice, expectedExactSizeInner), true)
@@ -233,13 +393,13 @@ func TestUnmarshalArrayWithFixedLength(t *testing.T) {
 	//-Zero Padded-------------------------------------------------------------
 	var dataZeroPadded = "AA0BB1\x00\x00\x0001\x00\x00"
 
-	var readZeroPadded testFixedLengthArrayUnmarshal
+	var readZeroPadded testFixedSizeArrayUnmarshal
 	err = Unmarshal([]byte(dataZeroPadded), &readZeroPadded, EncodingUTF8, TimezoneUTC, "")
 	assert.Nil(t, err)
 
-	var expectedZeroPaddedInner = []testInnerArrayUnmarshal{
-		{JustAField: "AA", AndAnOther: 0},
-		{JustAField: "BB", AndAnOther: 1},
+	var expectedZeroPaddedInner = []testFixedSizeArrayInnerUnmarshal{
+		{JustAField: "AA", AndAnother: 0},
+		{JustAField: "BB", AndAnother: 1},
 	}
 	assert.Equal(t, 2, len(readZeroPadded.StructSlice))
 	assert.Equal(t, reflect.DeepEqual(readZeroPadded.StructSlice, expectedZeroPaddedInner), true)
@@ -249,20 +409,23 @@ func TestUnmarshalArrayWithFixedLength(t *testing.T) {
 	//-With Terminator---------------------------------------------------------
 	var dataWithTerminator = "AA0BB1CC2\u000D0123"
 
-	var readWithTerminator testFixedLengthArrayUnmarshal
+	var readWithTerminator testFixedSizeArrayUnmarshal
 	err = Unmarshal([]byte(dataWithTerminator), &readWithTerminator, EncodingUTF8, TimezoneUTC, "\r")
 	assert.Nil(t, err)
 
-	var expectedWithTerminatorInner = []testInnerArrayUnmarshal{
-		{JustAField: "AA", AndAnOther: 0},
-		{JustAField: "BB", AndAnOther: 1},
-		{JustAField: "CC", AndAnOther: 2},
+	var expectedWithTerminatorInner = []testFixedSizeArrayInnerUnmarshal{
+		{JustAField: "AA", AndAnother: 0},
+		{JustAField: "BB", AndAnother: 1},
+		{JustAField: "CC", AndAnother: 2},
 	}
 	assert.Equal(t, 3, len(readWithTerminator.StructSlice))
 	assert.Equal(t, reflect.DeepEqual(readWithTerminator.StructSlice, expectedWithTerminatorInner), true)
 	assert.Equal(t, 4, len(readWithTerminator.PrimitiveSlice))
 	assert.Equal(t, reflect.DeepEqual(readWithTerminator.PrimitiveSlice, []int{0, 1, 2, 3}), true)
 }
+
+//
+//-Dynamic Array---------------------------------------------------------------
 
 type testDynamicArrayUnmarshalUnknownField struct {
 	NotHere   string `bin:":1"`
@@ -301,17 +464,23 @@ func TestUnmarshalDynamicArray(t *testing.T) {
 	assert.Equal(t, -1, result.IncorrectSize)
 	assert.Equal(t, reflect.DeepEqual(result.TheArray1, []int{0, 1, 2}), true)
 
+	//-------------------------------------------------------------------------
+
 	var dataWrongType = "A012"
 	var resultWrongType testDynamicArrayUnmarshalWrongType
 
 	err = Unmarshal([]byte(dataWrongType), &resultWrongType, EncodingUTF8, TimezoneUTC, "\r")
 	assert.EqualError(t, err, "invalid type for array size field 'Nope' - should be int")
 
+	//-------------------------------------------------------------------------
+
 	var dataWrongValue = "-1012"
 	var resultWrongValue testDynamicArrayUnmarshalWrongValue
 
 	err = Unmarshal([]byte(dataWrongValue), &resultWrongValue, EncodingUTF8, TimezoneUTC, "\r")
 	assert.EqualError(t, err, "invalid size for array size field 'IncorrectSize'")
+
+	//-------------------------------------------------------------------------
 
 	var dataNoField = "A012"
 	var resultNoField testDynamicArrayUnmarshalUnknownField

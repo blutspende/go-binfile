@@ -77,8 +77,6 @@ You can turn a filled annotated struct into a byte array.
 
 ## Primitive types
 
-### General annotations
-
 Annotations for the fields lie in the 'bin' tag and are separated by comma characters. All fields - except for nested structs - must be annotated. The converter only processes the exported fields.
 
 `` `bin:"<absolute_position>:<relative_length>"` ``
@@ -108,6 +106,8 @@ Currently, there is no support for string truncation but will be padded with spa
 To accompany this, there is a convenient "trim" annotation that can be added to the field. It will remove trailing spaces from the read value.
 
 ## Arrays
+
+If an array contains a primitive type, it also must have the generic absolute position and relative length annotation. Which will be applied to all elements as described above.
 
 ### Arrays with variable length and terminator
 

@@ -21,6 +21,10 @@ func getAnnotationList(tag string) ([]string, bool) {
 	return annotationsFiltered, len(annotationsFiltered) > 0
 }
 
+func hasAnnotationTrim(annotationList []string) bool {
+	return sliceContainsString(annotationList, "trim")
+}
+
 func getArrayAnnotation(annotationList []string) (string, bool) {
 
 	for i, val := range annotationList {
