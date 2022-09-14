@@ -38,12 +38,6 @@ func internalMarshal(record reflect.Value, onlyPaddWithZeros bool, padding byte,
 
 		var annotationList, hasAnnotations = getAnnotationList(binTag)
 
-		// skip processing terminator here - it's handled at the end of the array
-		// TODO: get rid of terminator field 'cause it will never be red and explicitly written by the array processor hence not needed
-		if sliceContainsString(annotationList, ANNOTATION_TERMINATOR) {
-			continue
-		}
-
 		absoluteAnnotatedPos, relativeAnnotatedLength, hasAnnotatedAddress, err := getAddressAnnotation(annotationList)
 		if err != nil {
 			return []byte{}, currentByte, fmt.Errorf("invalid address annotation field '%s' `%s`: %w", record.Type().Field(fieldNo).Name, binTag, err)
