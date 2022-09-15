@@ -12,13 +12,17 @@ func getAnnotationList(tag string) ([]string, bool) {
 	tag = strings.Replace(tag, " ", "", -1)
 	var annotations = strings.Split(tag, ",")
 	var annotationsFiltered []string
-	for i, _ := range annotations {
+	for i := range annotations {
 		if len(annotations[i]) > 0 {
 			annotationsFiltered = append(annotationsFiltered, annotations[i])
 		}
 	}
 
 	return annotationsFiltered, len(annotationsFiltered) > 0
+}
+
+func hasAnnotationTrim(annotationList []string) bool {
+	return sliceContainsString(annotationList, "trim")
 }
 
 func getArrayAnnotation(annotationList []string) (string, bool) {
@@ -51,7 +55,7 @@ func getArrayFixedSize(arrayAnnotation string) (int, bool) {
 		return 0, false
 	}
 
-	if num, err := strconv.Atoi(vals[1]); err == nil {
+	if num, err := strconv.Atoi(vals[1]); err == nil && num > 0 {
 		return num, true
 	}
 

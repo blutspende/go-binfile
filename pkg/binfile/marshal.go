@@ -38,12 +38,6 @@ func internalMarshal(record reflect.Value, onlyPaddWithZeros bool, padding byte,
 
 		var annotationList, hasAnnotations = getAnnotationList(binTag)
 
-		// skip processing terminator here - it's handled at the end of the array
-		// TODO: get rid of terminator field 'cause it will never be red and explicitly written by the array processor hence not needed
-		if sliceContainsString(annotationList, ANNOTATION_TERMINATOR) {
-			continue
-		}
-
 		absoluteAnnotatedPos, relativeAnnotatedLength, hasAnnotatedAddress, err := getAddressAnnotation(annotationList)
 		if err != nil {
 			return []byte{}, currentByte, fmt.Errorf("invalid address annotation field '%s' `%s`: %w", record.Type().Field(fieldNo).Name, binTag, err)
@@ -58,7 +52,7 @@ func internalMarshal(record reflect.Value, onlyPaddWithZeros bool, padding byte,
 				outBytes = append(outBytes, paddingBytes...)
 				currentByte += len(paddingBytes)
 			} else if currentByte > absoluteAnnotatedPos {
-				return []byte{}, currentByte, fmt.Errorf("absoulute position is bigger then the current '%s' `%s`", record.Type().Field(fieldNo).Name, binTag)
+				return []byte{}, currentByte, fmt.Errorf("absoulute position points backwards '%s' `%s`", record.Type().Field(fieldNo).Name, binTag)
 			}
 		}
 		/*
@@ -108,7 +102,10 @@ func internalMarshal(record reflect.Value, onlyPaddWithZeros bool, padding byte,
 				if size, isFixedSize := getArrayFixedSize(arrayAnnotation); isFixedSize {
 					arraySize = size
 				} else if fieldName, isDynamic := getArraySizeFieldName(arrayAnnotation); isDynamic {
-					_ = fieldName // TODO: find size by field name or error
+					arraySize, err = resolveDynamicArraySize(record, fieldName)
+					if err != nil {
+						return []byte{}, currentByte, err
+					}
 				}
 			}
 
@@ -135,7 +132,7 @@ func internalMarshal(record reflect.Value, onlyPaddWithZeros bool, padding byte,
 
 				default:
 
-					tempOutByte, currentByte, err = processSimpleTypes(currentElement, onlyPaddWithZeros, relativeAnnotatedLength, padding, currentByte, depth)
+					tempOutByte, currentByte, err = marshalSimpleTypes(currentElement, onlyPaddWithZeros, relativeAnnotatedLength, padding, currentByte, depth)
 					if err != nil {
 						return []byte{}, currentByte, fmt.Errorf("error processing field %s: %w", record.Type().Field(fieldNo).Name, err)
 					}
@@ -160,7 +157,7 @@ func internalMarshal(record reflect.Value, onlyPaddWithZeros bool, padding byte,
 		}
 
 		var tempOutByte []byte
-		tempOutByte, currentByte, err = processSimpleTypes(recordField, onlyPaddWithZeros, relativeAnnotatedLength, padding, currentByte, depth)
+		tempOutByte, currentByte, err = marshalSimpleTypes(recordField, onlyPaddWithZeros, relativeAnnotatedLength, padding, currentByte, depth)
 		if err != nil {
 			return []byte{}, currentByte, fmt.Errorf("error processing field '%s' `%s`: %w", record.Type().Field(fieldNo).Name, binTag, err)
 		}
@@ -171,7 +168,7 @@ func internalMarshal(record reflect.Value, onlyPaddWithZeros bool, padding byte,
 	return outBytes, currentByte, nil
 }
 
-func processSimpleTypes(recordField reflect.Value, onlyPaddWithZeros bool, relativeAnnotatedLength int, padding byte, currentByte int, depth int) ([]byte, int, error) {
+func marshalSimpleTypes(recordField reflect.Value, onlyPaddWithZeros bool, relativeAnnotatedLength int, padding byte, currentByte int, depth int) ([]byte, int, error) {
 
 	if onlyPaddWithZeros {
 		return make([]byte, relativeAnnotatedLength), currentByte + relativeAnnotatedLength, nil
