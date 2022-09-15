@@ -124,11 +124,33 @@ func TestUnmarshalMultipleRecords(t *testing.T) {
 
 //
 //-Top-level Array-------------------------------------------------------------
-/*
 
+type testTopLevelArrayInnerUnmarshal struct {
+	SomeField1 string `bin:":2"`
+	SomeField2 string `bin:":4"`
+	SomeField3 string `bin:"8:2"`
+}
 
+func TestUnmarshalTopLevelArray(t *testing.T) {
 
- */
+	var inputData = []byte("ABCDEFxx  123456xx  \r")
+	var err error
+
+	var result []testTopLevelArrayInnerUnmarshal
+	err = Unmarshal(inputData, &result, EncodingUTF8, TimezoneUTC, "\r")
+	assert.Nil(t, err)
+
+	assert.Equal(t, 2, len(result))
+
+	assert.Equal(t, "AB", result[0].SomeField1)
+	assert.Equal(t, "CDEF", result[0].SomeField2)
+	assert.Equal(t, "  ", result[0].SomeField3)
+
+	assert.Equal(t, "12", result[1].SomeField1)
+	assert.Equal(t, "3456", result[1].SomeField2)
+	assert.Equal(t, "  ", result[1].SomeField3)
+}
+
 //
 //-Annotation presence---------------------------------------------------------
 

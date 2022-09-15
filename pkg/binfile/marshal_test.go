@@ -130,11 +130,11 @@ func TestMarshalMultipleRecords(t *testing.T) {
 
 //
 //-Top-level Array-------------------------------------------------------------
-/*
+
 type testTopLevelArrayInnerMarshal struct {
 	SomeField1 string `bin:":2"`
 	SomeField2 string `bin:":4"`
-	SomeField3 string `bin:"8:2"` // add a "jump" of two charachters to force to fill up
+	SomeField3 string `bin:"8:2"`
 }
 
 func TestMarshalTopLevelArray(t *testing.T) {
@@ -147,9 +147,9 @@ func TestMarshalTopLevelArray(t *testing.T) {
 	result, err := Marshal(inputData, 'x', EncodingUTF8, TimezoneUTC, "\r")
 	assert.Nil(t, err)
 
-	assert.Equal(t, []byte("ABCDEFxx  \r123456xx  \r\r"), result)
+	assert.Equal(t, []byte("ABCDEFxx  123456xx  \r"), result)
 }
-*/
+
 //
 //-Annotation presence---------------------------------------------------------
 
@@ -176,9 +176,10 @@ func TestMarshalUnanotatedFieldsAreSkipped(t *testing.T) {
 	var result []byte
 	var err error
 
-	var inputData testUnannotatedValidUnmarshal
+	var inputData testUnannotatedValidMarshal
 	inputData.AnnotatedField = "12"
 	inputData.UnannotatedStruct.JustAField = "34"
+	_ = inputData.unannotatedUnexportedield // suppress warning
 
 	result, err = Marshal(inputData, ' ', EncodingUTF8, TimezoneUTC, "\r")
 	assert.Nil(t, err)
