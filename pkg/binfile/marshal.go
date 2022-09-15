@@ -8,15 +8,54 @@ import (
 
 func Marshal(target interface{}, padding byte, enc Encoding, tz Timezone, arrayTerminator string) ([]byte, error) {
 
+	// TODO: accepting a Ptr here is confusing as the func will not change the contents
 	if reflect.TypeOf(target).Kind() == reflect.Ptr {
 		return Marshal(reflect.ValueOf(target).Elem(), padding, enc, tz, arrayTerminator)
 	}
 
-	// todo check if target is struct :
-	targetStruct := reflect.ValueOf(target)
-	outBytes, _, err := internalMarshal(targetStruct, false, padding, arrayTerminator, 0, 1 /*depth*/)
+	var outBytes []byte
+	var err error
+	var depth = 0
 
-	return outBytes, err
+	var targetValue = reflect.ValueOf(target)
+	var targetKind = targetValue.Kind()
+
+	switch targetKind {
+	case reflect.Slice:
+		var innerValueKind = reflect.TypeOf(targetValue.Interface()).Elem().Kind()
+
+		for i := 0; i < targetValue.Len(); i++ {
+			var tempBytes []byte
+
+			switch innerValueKind {
+			case reflect.Slice:
+				// TODO: slice of slices?
+
+			case reflect.Struct:
+				tempBytes, _, err = internalMarshal(targetValue.Index(i), false, padding, arrayTerminator, 0, depth+1)
+				if err != nil {
+					return []byte{}, err
+				}
+				outBytes = append(outBytes, tempBytes...)
+
+			default:
+				return []byte{}, fmt.Errorf("invalid target - should be struct or slice of structs")
+			}
+		}
+
+		// TODO: end of the array terminator - might not needed
+		outBytes = append(outBytes, []byte(arrayTerminator)...)
+
+		return outBytes, err
+
+	case reflect.Struct:
+		// TODO: should we check if all bytes are consumed or at least return the current position for further processing of data?
+		outBytes, _, err = internalMarshal(targetValue, false, padding, arrayTerminator, 0, depth)
+		return outBytes, err
+
+	}
+
+	return []byte{}, fmt.Errorf("invalid target - should be struct or slice of structs")
 }
 
 func internalMarshal(record reflect.Value, onlyPaddWithZeros bool, padding byte, arrayTerminator string, currentByte int, depth int) ([]byte, int, error) {

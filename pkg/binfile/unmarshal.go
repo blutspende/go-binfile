@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-var ErrAbortArrayTerminator = fmt.Errorf("aborting due to array-terminator found")
+//var ErrAbortArrayTerminator = fmt.Errorf("aborting due to array-terminator found")
 
 // var ErrInvalidAddressAnnotation = fmt.Errorf("invalid address annotation")
 var ErrAnnotatedFieldNotWritable = fmt.Errorf("annotated Field is not writable")
@@ -17,53 +17,64 @@ var ErrFoundZeroValueBytes = errors.New("specified range is all zero value bytes
 
 func Unmarshal(inputBytes []byte, target interface{}, enc Encoding, tz Timezone, arrayTerminator string) error {
 
-	switch reflect.ValueOf(target).Kind() {
-	case reflect.Ptr:
-		nested := reflect.ValueOf(target).Elem()
-		switch nested.Kind() {
-		case reflect.Struct:
-			targetStruct := reflect.ValueOf(target).Elem()
-			_, err := internalUnmarshal(inputBytes, 0, targetStruct, arrayTerminator, 1, enc, tz)
-			return err // its not a desaster if we accidentaly descended into a non-struct;
-		case reflect.Slice:
-			targetSlice := reflect.ValueOf(target).Elem()
-			targetType := targetSlice.Type()
+	// only pointers allowed
+	if reflect.ValueOf(target).Kind() != reflect.Ptr {
+		return fmt.Errorf("unable to unmarshal %s of type %s", reflect.TypeOf(target).Name(), reflect.TypeOf(target))
+	}
 
-			currentByte := 0
-			for {
-				outputTarget := reflect.New(targetType.Elem())
+	var targetValue = reflect.ValueOf(target).Elem()
+	var targetKind = targetValue.Kind()
+	switch targetKind {
+	case reflect.Struct:
+		_, err := internalUnmarshal(inputBytes, 0, targetValue, arrayTerminator, 1, enc, tz)
+		return err
 
-				var err error
-				lastByte := currentByte
-				currentByte, err = internalUnmarshal(inputBytes, currentByte, outputTarget.Elem(), arrayTerminator, 1, enc, tz)
+	case reflect.Slice:
+		var targetInnerKind = reflect.ValueOf(targetValue).Kind()
 
-				if lastByte == currentByte {
-					return nil // no further progress
+		var currentByte = 0
+		for {
+			var outputTarget = reflect.New(targetValue.Type().Elem())
+
+			switch targetInnerKind {
+			case reflect.Slice:
+				// TODO: slice of slices?
+
+			case reflect.Struct:
+
+				//lastByte := currentByte
+				var processedBytes, err = internalUnmarshal(inputBytes[currentByte:], 0, outputTarget.Elem(), arrayTerminator, 1, enc, tz)
+				if err != nil {
+					return err
 				}
 
-				if err == nil || err == ErrAbortArrayTerminator {
-					// helpflul debugging
-					// fmt.Printf("Adding slice %#v\n", outputTarget.Elem())
-					targetSlice = reflect.Append(targetSlice, outputTarget.Elem())
-					reflect.ValueOf(target).Elem().Set(targetSlice)
+				currentByte += processedBytes
+
+				// TODO: Y do we need this?
+				/*
+					if lastByte == currentByte {
+						return nil // no further progress
+					}
+				*/
+
+				targetValue = reflect.Append(targetValue, outputTarget.Elem())
+				reflect.ValueOf(target).Elem().Set(targetValue)
+
+				// top-level arrays are always terminator types - advance through
+				var strvalue = string(inputBytes[currentByte : currentByte+len(arrayTerminator)])
+				if strvalue == arrayTerminator {
+					currentByte = currentByte + len(arrayTerminator)
 				}
 
 				if currentByte >= len(inputBytes) {
 					return nil // the end (do not move this lower in code, as the boundary check has to be first)
 				}
 
-				if err == ErrAbortArrayTerminator {
-					continue // just the end of an array
-				}
-
-				if err != nil && err != ErrAbortArrayTerminator {
-					return err // failed
-				}
-
+			default:
+				return fmt.Errorf("invalid target - should be struct or slice of structs")
 			}
-		default:
-			return fmt.Errorf("unable to unmarshal %s of type %s", reflect.TypeOf(target).Name(), reflect.TypeOf(target))
 		}
+
 	default:
 		return fmt.Errorf("unable to unmarshal %s of type %s", reflect.TypeOf(target).Name(), reflect.TypeOf(target))
 	}
