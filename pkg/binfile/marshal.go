@@ -166,7 +166,7 @@ func internalMarshal(record reflect.Value, onlyPaddWithZeros bool, padding byte,
 
 				default:
 
-					tempOutByte, currentByte, err = marshalSimpleTypes(currentElement, onlyPaddWithZeros, relativeAnnotatedLength, padding, currentByte, depth)
+					tempOutByte, currentByte, err = marshalSimpleTypes(currentElement, onlyPaddWithZeros, relativeAnnotatedLength, annotationList, currentByte, depth)
 					if err != nil {
 						return []byte{}, currentByte, fmt.Errorf("error processing field %s: %w", record.Type().Field(fieldNo).Name, err)
 					}
@@ -191,7 +191,7 @@ func internalMarshal(record reflect.Value, onlyPaddWithZeros bool, padding byte,
 		}
 
 		var tempOutByte []byte
-		tempOutByte, currentByte, err = marshalSimpleTypes(recordField, onlyPaddWithZeros, relativeAnnotatedLength, padding, currentByte, depth)
+		tempOutByte, currentByte, err = marshalSimpleTypes(recordField, onlyPaddWithZeros, relativeAnnotatedLength, annotationList, currentByte, depth)
 		if err != nil {
 			return []byte{}, currentByte, fmt.Errorf("error processing field '%s' `%s`: %w", record.Type().Field(fieldNo).Name, binTag, err)
 		}
@@ -202,7 +202,7 @@ func internalMarshal(record reflect.Value, onlyPaddWithZeros bool, padding byte,
 	return outBytes, currentByte, nil
 }
 
-func marshalSimpleTypes(recordField reflect.Value, onlyPaddWithZeros bool, relativeAnnotatedLength int, padding byte, currentByte int, depth int) ([]byte, int, error) {
+func marshalSimpleTypes(recordField reflect.Value, onlyPaddWithZeros bool, relativeAnnotatedLength int, annotationList []string, currentByte int, depth int) ([]byte, int, error) {
 
 	if onlyPaddWithZeros {
 		return make([]byte, relativeAnnotatedLength), currentByte + relativeAnnotatedLength, nil
@@ -241,7 +241,13 @@ func marshalSimpleTypes(recordField reflect.Value, onlyPaddWithZeros bool, relat
 		if len(tempBytes) > relativeAnnotatedLength {
 			return []byte{}, currentByte, fmt.Errorf("invalid value length '%d'", len(tempBytes))
 		} else if len(tempBytes) < relativeAnnotatedLength {
-			outBytes, _ = appendPaddingBytes(outBytes, relativeAnnotatedLength-len(tempBytes), byte('0'))
+			var paddingByte byte
+			if hasAnnotationPadspace(annotationList) {
+				paddingByte = byte(' ')
+			} else {
+				paddingByte = byte('0')
+			}
+			outBytes, _ = appendPaddingBytes(outBytes, relativeAnnotatedLength-len(tempBytes), paddingByte)
 		}
 
 		if isNegative {
@@ -268,18 +274,29 @@ func marshalSimpleTypes(recordField reflect.Value, onlyPaddWithZeros bool, relat
 			}
 		}
 
-		var tempBytes = []byte(tempStr)
+		var isNegative = tempFloat < 0
+		if isNegative {
+			outBytes = append(outBytes, '-')
+		}
 
+		var tempBytes = []byte(tempStr)
 		if len(tempBytes) > relativeAnnotatedLength {
 			return []byte{}, currentByte, fmt.Errorf("invalid value length '%d'", len(tempBytes))
+		} else if len(tempBytes) < relativeAnnotatedLength {
+			var paddingByte byte
+			if hasAnnotationPadspace(annotationList) {
+				paddingByte = byte(' ')
+			} else {
+				paddingByte = byte('0')
+			}
+			outBytes, _ = appendPaddingBytes(outBytes, relativeAnnotatedLength-len(tempBytes), paddingByte)
 		}
 
-		outBytes = append(outBytes, tempBytes...)
-
-		if len(tempBytes) < relativeAnnotatedLength {
-			outBytes, _ = appendPaddingBytes(outBytes, relativeAnnotatedLength-len(tempBytes), byte('0'))
+		if isNegative {
+			outBytes = append(outBytes, tempBytes[1:]...)
+		} else {
+			outBytes = append(outBytes, tempBytes...)
 		}
-
 		currentByte += relativeAnnotatedLength
 
 	default:

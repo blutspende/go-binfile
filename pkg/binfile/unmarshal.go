@@ -192,7 +192,7 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 
 				default:
 
-					currentByte, err = unmarshalSimpleTypes(inputBytes, currentByte, outputTarget.Elem(), relativeAnnotatedLength, annotationList, arrayTerminator, depth+1, enc, tz)
+					currentByte, err = unmarshalSimpleTypes(inputBytes, currentByte, outputTarget.Elem(), relativeAnnotatedLength, annotationList, depth+1, enc, tz)
 					if err != nil {
 						if !isTerminatorType && errors.Is(err, ErrFoundZeroValueBytes) {
 							continue
@@ -229,7 +229,7 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 			return currentByte, fmt.Errorf("error processing field '%s' `%s`: %w", record.Type().Field(fieldNo).Name, binTag, fmt.Errorf("non-struct field must have address annotation"))
 		}
 
-		currentByte, err = unmarshalSimpleTypes(inputBytes, currentByte, recordField, relativeAnnotatedLength, annotationList, arrayTerminator, depth+1, enc, tz)
+		currentByte, err = unmarshalSimpleTypes(inputBytes, currentByte, recordField, relativeAnnotatedLength, annotationList, depth+1, enc, tz)
 		if err != nil {
 			return currentByte, fmt.Errorf("error processing field '%s' `%s`: %w", record.Type().Field(fieldNo).Name, binTag, err)
 		}
@@ -238,7 +238,7 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 	return currentByte, nil
 }
 
-func unmarshalSimpleTypes(inputBytes []byte, currentByte int, recordField reflect.Value, relativeAnnotatedLength int, annotationList []string, arrayTerminator string, depth int, enc Encoding, tz Timezone) (int, error) {
+func unmarshalSimpleTypes(inputBytes []byte, currentByte int, recordField reflect.Value, relativeAnnotatedLength int, annotationList []string, depth int, enc Encoding, tz Timezone) (int, error) {
 
 	if relativeAnnotatedLength > 0 {
 		// Having a length, the total length is not supposed to exceed the boundaries of the input
@@ -277,7 +277,9 @@ func unmarshalSimpleTypes(inputBytes []byte, currentByte int, recordField reflec
 		strvalue := string(inputBytes[currentByte : currentByte+relativeAnnotatedLength])
 		currentByte += relativeAnnotatedLength
 
-		strvalue = strings.TrimSpace(strvalue)
+		if hasAnnotationPadspace(annotationList) {
+			strvalue = strings.Replace(strvalue, " ", "", -1) // ex.: "-  3"
+		}
 
 		num, err := strconv.Atoi(strvalue)
 		if err != nil {
@@ -288,9 +290,13 @@ func unmarshalSimpleTypes(inputBytes []byte, currentByte int, recordField reflec
 
 	case reflect.Float32:
 
-		value := string(inputBytes[currentByte : currentByte+relativeAnnotatedLength])
+		strvalue := string(inputBytes[currentByte : currentByte+relativeAnnotatedLength])
 		currentByte += relativeAnnotatedLength
-		strvalue := strings.TrimSpace(value)
+
+		if hasAnnotationPadspace(annotationList) {
+			strvalue = strings.Replace(strvalue, " ", "", -1) // ex.: "-  3.1"
+		}
+
 		num, err := strconv.ParseFloat(strvalue, 32)
 		if err != nil {
 			return currentByte, err
@@ -300,9 +306,13 @@ func unmarshalSimpleTypes(inputBytes []byte, currentByte int, recordField reflec
 
 	case reflect.Float64:
 
-		value := string(inputBytes[currentByte : currentByte+relativeAnnotatedLength])
+		strvalue := string(inputBytes[currentByte : currentByte+relativeAnnotatedLength])
 		currentByte += relativeAnnotatedLength
-		strvalue := strings.TrimSpace(value)
+
+		if hasAnnotationPadspace(annotationList) {
+			strvalue = strings.Replace(strvalue, " ", "", -1) // ex.: "-  3.1"
+		}
+
 		num, err := strconv.ParseFloat(strvalue, 64)
 		if err != nil {
 			return currentByte, err

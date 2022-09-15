@@ -272,17 +272,21 @@ func TestUnmarshalString(t *testing.T) {
 //-Integer---------------------------------------------------------------------
 
 type testIntUnmarshal struct {
-	Length1        int `bin:":2"`
-	Length2        int `bin:":4"`
-	AbsPos         int `bin:"8:2"`
-	Padded         int `bin:":4"`
-	Negative       int `bin:":2"`
-	PaddedNegative int `bin:":4"`
+	Length1                 int `bin:":2"`
+	Length2                 int `bin:":4"`
+	AbsPos                  int `bin:"8:2"`
+	Padded                  int `bin:":4"`
+	Negative                int `bin:":2"`
+	PaddedNegative          int `bin:":4"`
+	PaddedWithSpace         int `bin:":4,padspace"`
+	PaddedWithSpaceNegative int `bin:":4,padspace"`
 }
+
+//IntFieldPadding int     `bin:":3,padzero"` TODO
 
 func TestUnmarshalInt(t *testing.T) {
 
-	var inputData = []byte("121234xx120012-2-002")
+	var inputData = []byte("121234xx120012-2-002   3-  4")
 	var err error
 
 	var result testIntUnmarshal
@@ -295,25 +299,29 @@ func TestUnmarshalInt(t *testing.T) {
 	assert.Equal(t, 12, result.Padded)
 	assert.Equal(t, -2, result.Negative)
 	assert.Equal(t, -2, result.PaddedNegative)
+	assert.Equal(t, 3, result.PaddedWithSpace)
+	assert.Equal(t, -4, result.PaddedWithSpaceNegative)
 }
 
 //
 //-Float32 / Float64-----------------------------------------------------------
 
 type testFloatUnmarshal struct {
-	Length1        float32 `bin:":1"`
-	Length2        float32 `bin:":2"`
-	Length3        float32 `bin:":3"`
-	AbsPos         float32 `bin:"8:4"`
-	Padded         float32 `bin:":6"`
-	Negative       float32 `bin:":5"`
-	PaddedNegative float32 `bin:":6"`
+	Length1                 float32 `bin:":1"`
+	Length2                 float32 `bin:":2"`
+	Length3                 float32 `bin:":3"`
+	AbsPos                  float32 `bin:"8:4"`
+	Padded                  float32 `bin:":6"`
+	Negative                float32 `bin:":5"`
+	PaddedNegative          float32 `bin:":6"`
+	PaddedWithSpace         float32 `bin:":6,padspace"`
+	PaddedWithSpaceNegative float32 `bin:":6,padspace"`
 	//BigNum         float64 `bin:":4"` TODO
 }
 
 func TestUnmarshalFloat(t *testing.T) {
 
-	var inputData = []byte("11.1.2xx1.231.2300-1.23-1.2000.00")
+	var inputData = []byte("11.1.2xx1.23001.23-1.23-001.2  1.23-  1.2")
 	var err error
 
 	var result testFloatUnmarshal
@@ -327,6 +335,8 @@ func TestUnmarshalFloat(t *testing.T) {
 	assert.Equal(t, float32(1.23), result.Padded)
 	assert.Equal(t, float32(-1.23), result.Negative)
 	assert.Equal(t, float32(-1.2), result.PaddedNegative)
+	assert.Equal(t, float32(1.23), result.PaddedWithSpace)
+	assert.Equal(t, float32(-1.2), result.PaddedWithSpaceNegative)
 }
 
 //

@@ -208,7 +208,6 @@ type testValidAddressingMarshal struct {
 	SomeField2 string `bin:":4"`
 	SomeField3 string `bin:"8:2"` // add a "jump" of two charachters to force to fill up
 	IntField   int    `bin:":3"`
-	//IntFieldPadding int     `bin:":3,padzero"` TODO
 	//DecimalField    float32 `bin:":5,decimal(2)"` TODO
 }
 
@@ -263,62 +262,70 @@ func TestMarshalString(t *testing.T) {
 //-Integer---------------------------------------------------------------------
 
 type testIntMarshal struct {
-	Length1        int `bin:":2"`
-	Length2        int `bin:":4"`
-	AbsPos         int `bin:"8:2"`
-	Padded         int `bin:":4"`
-	Negative       int `bin:":2"`
-	PaddedNegative int `bin:":4"`
+	Length1                 int `bin:":2"`
+	Length2                 int `bin:":4"`
+	AbsPos                  int `bin:"8:2"`
+	Padded                  int `bin:":4"`
+	Negative                int `bin:":2"`
+	PaddedNegative          int `bin:":4"`
+	PaddedWithSpace         int `bin:":4,padspace"`
+	PaddedWithSpaceNegative int `bin:":4,padspace"`
 }
 
 func TestMarshalInt(t *testing.T) {
 
 	var inputData = testIntMarshal{
-		Length1:        12,
-		Length2:        1234,
-		AbsPos:         12,
-		Padded:         12,
-		Negative:       -2,
-		PaddedNegative: -2,
+		Length1:                 12,
+		Length2:                 1234,
+		AbsPos:                  12,
+		Padded:                  12,
+		Negative:                -2,
+		PaddedNegative:          -2,
+		PaddedWithSpace:         3,
+		PaddedWithSpaceNegative: -4,
 	}
 
 	result, err := Marshal(inputData, 'x', EncodingUTF8, TimezoneUTC, "\r")
 	assert.Nil(t, err)
 
-	assert.Equal(t, []byte("121234xx120012-2-002"), result)
+	assert.Equal(t, []byte("121234xx120012-2-002   3-  4"), result)
 }
 
 //
 //-Float32 / Float64-----------------------------------------------------------
 
 type testFloatMarshal struct {
-	Length1        float32 `bin:":1"`
-	Length2        float32 `bin:":2"`
-	Length3        float32 `bin:":3"`
-	AbsPos         float32 `bin:"8:4"`
-	Padded         float32 `bin:":6"`
-	Negative       float32 `bin:":5"`
-	PaddedNegative float32 `bin:":6"`
+	Length1                 float32 `bin:":1"`
+	Length2                 float32 `bin:":2"`
+	Length3                 float32 `bin:":3"`
+	AbsPos                  float32 `bin:"8:4"`
+	Padded                  float32 `bin:":6"`
+	Negative                float32 `bin:":5"`
+	PaddedNegative          float32 `bin:":6"`
+	PaddedWithSpace         float32 `bin:":6,padspace"`
+	PaddedWithSpaceNegative float32 `bin:":6,padspace"`
 	//BigNum         float64 `bin:":4"` // TODO
 }
 
 func TestMarshalFloat(t *testing.T) {
 
 	var inputData = testFloatMarshal{
-		Length1:        1,  // TODO: is '1' can be a float?
-		Length2:        1., // TODO: is '1.' can be a float?
-		Length3:        1.2,
-		AbsPos:         1.23,
-		Padded:         1.23,
-		Negative:       -1.23,
-		PaddedNegative: -1.2,
+		Length1:                 1,  // TODO: is '1' can be a float?
+		Length2:                 1., // TODO: is '1.' can be a float?
+		Length3:                 1.2,
+		AbsPos:                  1.23,
+		Padded:                  1.23,
+		Negative:                -1.23,
+		PaddedNegative:          -1.2,
+		PaddedWithSpace:         1.23,
+		PaddedWithSpaceNegative: -1.2,
 		//BigNum:         math.MaxFloat32 + 1, // TODO: scientific notation?
 	}
 
 	var result, err = Marshal(inputData, 'x', EncodingUTF8, TimezoneUTC, "\r")
 	assert.Nil(t, err)
 
-	assert.Equal(t, []byte("11.1.2xx1.231.2300-1.23-1.200"), result)
+	assert.Equal(t, []byte("11.1.2xx1.23001.23-1.23-001.2  1.23-  1.2"), result)
 }
 
 //
