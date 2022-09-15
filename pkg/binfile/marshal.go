@@ -84,12 +84,7 @@ func internalMarshal(record reflect.Value, onlyPaddWithZeros bool, padding byte,
 
 		if absoluteAnnotatedPos != -1 {
 			if currentByte < absoluteAnnotatedPos {
-				var paddingBytes = make([]byte, absoluteAnnotatedPos-currentByte)
-				for i := range paddingBytes {
-					paddingBytes[i] = padding
-				}
-				outBytes = append(outBytes, paddingBytes...)
-				currentByte += len(paddingBytes)
+				outBytes, currentByte = appendPaddingBytes(outBytes, absoluteAnnotatedPos-currentByte, padding)
 			} else if currentByte > absoluteAnnotatedPos {
 				return []byte{}, currentByte, fmt.Errorf("absoulute position points backwards '%s' `%s`", record.Type().Field(fieldNo).Name, binTag)
 			}
@@ -223,11 +218,7 @@ func marshalSimpleTypes(recordField reflect.Value, onlyPaddWithZeros bool, relat
 		if len(tempBytes) > relativeAnnotatedLength {
 			return []byte{}, currentByte, fmt.Errorf("invalid value length '%d'", len(tempBytes))
 		} else if len(tempBytes) < relativeAnnotatedLength {
-			var paddingBytes = make([]byte, relativeAnnotatedLength-len(tempBytes))
-			for i := range paddingBytes {
-				paddingBytes[i] = byte(' ')
-			}
-			outBytes = append(outBytes, paddingBytes...)
+			outBytes, _ = appendPaddingBytes(outBytes, relativeAnnotatedLength-len(tempBytes), byte(' '))
 		}
 
 		outBytes = append(outBytes, tempBytes...)
@@ -250,12 +241,7 @@ func marshalSimpleTypes(recordField reflect.Value, onlyPaddWithZeros bool, relat
 		if len(tempBytes) > relativeAnnotatedLength {
 			return []byte{}, currentByte, fmt.Errorf("invalid value length '%d'", len(tempBytes))
 		} else if len(tempBytes) < relativeAnnotatedLength {
-			var paddingLength = relativeAnnotatedLength - len(tempBytes)
-			var paddingBytes = make([]byte, paddingLength)
-			for i := range paddingBytes {
-				paddingBytes[i] = byte('0')
-			}
-			outBytes = append(outBytes, paddingBytes...)
+			outBytes, _ = appendPaddingBytes(outBytes, relativeAnnotatedLength-len(tempBytes), byte('0'))
 		}
 
 		if isNegative {
@@ -291,12 +277,7 @@ func marshalSimpleTypes(recordField reflect.Value, onlyPaddWithZeros bool, relat
 		outBytes = append(outBytes, tempBytes...)
 
 		if len(tempBytes) < relativeAnnotatedLength {
-			var paddingLength = relativeAnnotatedLength - len(tempBytes)
-			var paddingBytes = make([]byte, paddingLength)
-			for i := range paddingBytes {
-				paddingBytes[i] = byte('0')
-			}
-			outBytes = append(outBytes, paddingBytes...)
+			outBytes, _ = appendPaddingBytes(outBytes, relativeAnnotatedLength-len(tempBytes), byte('0'))
 		}
 
 		currentByte += relativeAnnotatedLength

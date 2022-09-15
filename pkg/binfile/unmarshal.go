@@ -61,10 +61,7 @@ func Unmarshal(inputBytes []byte, target interface{}, enc Encoding, tz Timezone,
 				reflect.ValueOf(target).Elem().Set(targetValue)
 
 				// top-level arrays are always terminator types - advance through
-				var strvalue = string(inputBytes[currentByte : currentByte+len(arrayTerminator)])
-				if strvalue == arrayTerminator {
-					currentByte = currentByte + len(arrayTerminator)
-				}
+				currentByte, _ = advanceThroughTerminator(inputBytes, currentByte, arrayTerminator)
 
 				if currentByte >= len(inputBytes) {
 					return nil // the end (do not move this lower in code, as the boundary check has to be first)
@@ -217,10 +214,8 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 
 				// TODO: are we sure we need to check for a terminator in a fixed sized array's end? ref.: TestMarshalArrayWithFixedLength
 				if isTerminatorType || (!isTerminatorType && arrayIdx == arraySize-1) {
-					// check if next bytes are a terminator
-					var strvalue = string(inputBytes[currentByte : currentByte+len(arrayTerminator)])
-					if strvalue == arrayTerminator {
-						currentByte = currentByte + len(arrayTerminator)
+					var isFound bool
+					if currentByte, isFound = advanceThroughTerminator(inputBytes, currentByte, arrayTerminator); isFound {
 						break
 					}
 				}

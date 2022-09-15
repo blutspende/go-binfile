@@ -41,3 +41,22 @@ func sliceContainsString(list []string, search string) bool {
 	}
 	return false
 }
+
+func advanceThroughTerminator(byteArray []byte, currentPos int, arrayTerminator string) (int, bool) {
+	if len(byteArray) >= currentPos+len(arrayTerminator) {
+		var strvalue = string(byteArray[currentPos : currentPos+len(arrayTerminator)])
+		if strvalue == arrayTerminator {
+			return currentPos + len(arrayTerminator), true
+		}
+	}
+	return currentPos, false
+}
+
+func appendPaddingBytes(original []byte, length int, byteToUse byte) ([]byte, int) {
+	var paddingBytes = make([]byte, length)
+	for i := range paddingBytes {
+		paddingBytes[i] = byteToUse
+	}
+	var temp = append(original, paddingBytes...)
+	return temp, len(temp)
+}
