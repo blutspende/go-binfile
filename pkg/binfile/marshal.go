@@ -261,12 +261,18 @@ func marshalSimpleTypes(recordField reflect.Value, onlyPaddWithZeros bool, relat
 
 		// TODO: is there a minimal length for a float?
 
+		var precision = -1
+		var err error
+		if precision, err = getPrecisionFromAnnotation(annotationList); err != nil {
+			return []byte{}, currentByte, err
+		}
+
 		var tempFloat = recordField.Float()
 		var tempStr string
-		if reflect.TypeOf(recordField.Interface()).Kind() == reflect.Float32 {
-			tempStr = strconv.FormatFloat(tempFloat, 'f', -1, 32)
+		if valueKind == reflect.Float32 {
+			tempStr = strconv.FormatFloat(tempFloat, 'f', precision, 32)
 		} else {
-			tempStr = strconv.FormatFloat(tempFloat, 'f', -1, 64)
+			tempStr = strconv.FormatFloat(tempFloat, 'f', precision, 64)
 		}
 		if tempFloat == float64(int(tempFloat)) { // is truly an int?
 			if relativeAnnotatedLength > 1 {

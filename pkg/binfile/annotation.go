@@ -133,3 +133,26 @@ func readAddressAnnotation(str string) (int, int, error) {
 
 	return abs, length, err
 }
+
+func getPrecisionFromAnnotation(annotationList []string) (int, error) {
+
+	for i, precisionAnnotation := range annotationList {
+		if strings.HasPrefix(annotationList[i], "precision") {
+
+			var vals = strings.Split(precisionAnnotation, ":")
+
+			if len(vals) != 2 {
+				return -1, nil
+			}
+
+			// -1 is a valid precision - means all digits needed
+			if precision, err := strconv.Atoi(vals[1]); err == nil && precision >= -1 {
+				return precision, nil
+			}
+
+			return -1, fmt.Errorf("invalid precision given '%s'", vals[1])
+		}
+	}
+
+	return -1, nil
+}

@@ -208,7 +208,6 @@ type testValidAddressingMarshal struct {
 	SomeField2 string `bin:":4"`
 	SomeField3 string `bin:"8:2"` // add a "jump" of two charachters to force to fill up
 	IntField   int    `bin:":3"`
-	//DecimalField    float32 `bin:":5,decimal(2)"` TODO
 }
 
 func TestMarshalAddressing(t *testing.T) {
@@ -304,6 +303,7 @@ type testFloatMarshal struct {
 	PaddedNegative          float32 `bin:":6"`
 	PaddedWithSpace         float32 `bin:":6,padspace"`
 	PaddedWithSpaceNegative float32 `bin:":6,padspace"`
+	Precision               float32 `bin:":7,precision:2,padspace"`
 	//BigNum         float64 `bin:":4"` // TODO
 }
 
@@ -319,13 +319,14 @@ func TestMarshalFloat(t *testing.T) {
 		PaddedNegative:          -1.2,
 		PaddedWithSpace:         1.23,
 		PaddedWithSpaceNegative: -1.2,
+		Precision:               -1.23456,
 		//BigNum:         math.MaxFloat32 + 1, // TODO: scientific notation?
 	}
 
 	var result, err = Marshal(inputData, 'x', EncodingUTF8, TimezoneUTC, "\r")
 	assert.Nil(t, err)
 
-	assert.Equal(t, []byte("11.1.2xx1.23001.23-1.23-001.2  1.23-  1.2"), result)
+	assert.Equal(t, []byte("11.1.2xx1.23001.23-1.23-001.2  1.23-  1.2-  1.23"), result)
 }
 
 //

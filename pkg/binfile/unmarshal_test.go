@@ -316,12 +316,13 @@ type testFloatUnmarshal struct {
 	PaddedNegative          float32 `bin:":6"`
 	PaddedWithSpace         float32 `bin:":6,padspace"`
 	PaddedWithSpaceNegative float32 `bin:":6,padspace"`
+	Precision               float32 `bin:":6,precision:2"` // setting the decimal places shouldn't affect reading. can cause loss of data
 	//BigNum         float64 `bin:":4"` TODO
 }
 
 func TestUnmarshalFloat(t *testing.T) {
 
-	var inputData = []byte("11.1.2xx1.23001.23-1.23-001.2  1.23-  1.2")
+	var inputData = []byte("11.1.2xx1.23001.23-1.23-001.2  1.23-  1.2-1.234")
 	var err error
 
 	var result testFloatUnmarshal
@@ -337,6 +338,7 @@ func TestUnmarshalFloat(t *testing.T) {
 	assert.Equal(t, float32(-1.2), result.PaddedNegative)
 	assert.Equal(t, float32(1.23), result.PaddedWithSpace)
 	assert.Equal(t, float32(-1.2), result.PaddedWithSpaceNegative)
+	assert.Equal(t, float32(-1.234), result.Precision)
 }
 
 //
