@@ -103,15 +103,15 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 			}
 			currentByte = newPos
 		}
-
-		// Really useful debugging:
-		for k := 0; k < depth; k++ {
-			fmt.Print(" ")
-		}
-		fmt.Printf("Field %s (%d:%d) with at %d \n",
-			record.Type().Field(fieldNo).Name,
-			absoluteAnnotatedPos, relativeAnnotatedLength, currentByte)
-
+		/*
+			// Really useful debugging:
+			for k := 0; k < depth; k++ {
+				fmt.Print(" ")
+			}
+			fmt.Printf("Field %s (%d:%d) with at %d \n",
+				record.Type().Field(fieldNo).Name,
+				absoluteAnnotatedPos, relativeAnnotatedLength, currentByte)
+		*/
 		var valueKind = reflect.TypeOf(recordField.Interface()).Kind()
 
 		if valueKind == reflect.Struct {
