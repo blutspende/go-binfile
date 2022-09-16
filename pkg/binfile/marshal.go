@@ -41,15 +41,14 @@ func Marshal(target interface{}, padding byte, enc Encoding, tz Timezone, arrayT
 			default:
 				return []byte{}, fmt.Errorf("invalid target - should be struct or slice of structs")
 			}
-		}
 
-		// TODO: end of the array terminator - might not needed
-		outBytes = append(outBytes, []byte(arrayTerminator)...)
+			// for separating messages
+			outBytes = append(outBytes, []byte(arrayTerminator)...)
+		}
 
 		return outBytes, err
 
 	case reflect.Struct:
-		// TODO: should we check if all bytes are consumed or at least return the current position for further processing of data?
 		outBytes, _, err = internalMarshal(targetValue, false, padding, arrayTerminator, 0, depth)
 		return outBytes, err
 
@@ -176,9 +175,8 @@ func internalMarshal(record reflect.Value, onlyPaddWithZeros bool, padding byte,
 			}
 			onlyPaddWithZeros = false
 
-			// TODO: why do need the terminator in the 2nd case here?
+			// TODO: why do we need the terminator in the 2nd case here?
 			if isTerminatorType || sliceValue.Len() > arraySize {
-				// TODO: do we always need this at the end or only if it's not the last element in a struct?
 				outBytes = append(outBytes, arrayTerminator...)
 				currentByte += len(arrayTerminator)
 			}
@@ -232,34 +230,40 @@ func marshalSimpleTypes(recordField reflect.Value, onlyPaddWithZeros bool, relat
 			return []byte{}, currentByte, fmt.Errorf("int conversion overflow 32 vs 64 bit system")
 		}
 
+		var isSignForced = hasAnnotationForceSign(annotationList)
 		var isNegative = tempInt < 0
 		if isNegative {
 			outBytes = append(outBytes, '-')
+		} else if isSignForced {
+			outBytes = append(outBytes, '+')
 		}
 
 		var tempBytes = []byte(strconv.Itoa(tempInt))
-		if len(tempBytes) > relativeAnnotatedLength {
-			return []byte{}, currentByte, fmt.Errorf("invalid value length '%d'", len(tempBytes))
-		} else if len(tempBytes) < relativeAnnotatedLength {
+		if isNegative { // handle negative sign separately
+			tempBytes = tempBytes[1:]
+		}
+
+		var currLength = len(tempBytes)
+		if isNegative || isSignForced {
+			currLength++
+		}
+
+		if currLength > relativeAnnotatedLength {
+			return []byte{}, currentByte, fmt.Errorf("invalid value length '%d'", currLength)
+		} else if currLength < relativeAnnotatedLength {
 			var paddingByte byte
 			if hasAnnotationPadspace(annotationList) {
 				paddingByte = byte(' ')
 			} else {
 				paddingByte = byte('0')
 			}
-			outBytes, _ = appendPaddingBytes(outBytes, relativeAnnotatedLength-len(tempBytes), paddingByte)
+			outBytes, _ = appendPaddingBytes(outBytes, relativeAnnotatedLength-currLength, paddingByte)
 		}
 
-		if isNegative {
-			outBytes = append(outBytes, tempBytes[1:]...)
-		} else {
-			outBytes = append(outBytes, tempBytes...)
-		}
+		outBytes = append(outBytes, tempBytes...)
 		currentByte += relativeAnnotatedLength
 
 	case reflect.Float32, reflect.Float64:
-
-		// TODO: is there a minimal length for a float?
 
 		var precision = -1
 		var err error
@@ -272,7 +276,7 @@ func marshalSimpleTypes(recordField reflect.Value, onlyPaddWithZeros bool, relat
 		if valueKind == reflect.Float32 {
 			tempStr = strconv.FormatFloat(tempFloat, 'f', precision, 32)
 		} else {
-			tempStr = strconv.FormatFloat(tempFloat, 'f', precision, 64)
+			tempStr = strconv.FormatFloat(tempFloat, 'E', precision, 64)
 		}
 		if tempFloat == float64(int(tempFloat)) { // is truly an int?
 			if relativeAnnotatedLength > 1 {
@@ -280,29 +284,37 @@ func marshalSimpleTypes(recordField reflect.Value, onlyPaddWithZeros bool, relat
 			}
 		}
 
+		var isSignForced = hasAnnotationForceSign(annotationList)
 		var isNegative = tempFloat < 0
 		if isNegative {
 			outBytes = append(outBytes, '-')
+		} else if isSignForced {
+			outBytes = append(outBytes, '+')
 		}
 
 		var tempBytes = []byte(tempStr)
-		if len(tempBytes) > relativeAnnotatedLength {
-			return []byte{}, currentByte, fmt.Errorf("invalid value length '%d'", len(tempBytes))
-		} else if len(tempBytes) < relativeAnnotatedLength {
+		if isNegative { // handle negative sign separately
+			tempBytes = tempBytes[1:]
+		}
+
+		var currLength = len(tempBytes)
+		if isNegative || isSignForced {
+			currLength++
+		}
+
+		if currLength > relativeAnnotatedLength {
+			return []byte{}, currentByte, fmt.Errorf("invalid value length '%d'", currLength)
+		} else if currLength < relativeAnnotatedLength {
 			var paddingByte byte
 			if hasAnnotationPadspace(annotationList) {
 				paddingByte = byte(' ')
 			} else {
 				paddingByte = byte('0')
 			}
-			outBytes, _ = appendPaddingBytes(outBytes, relativeAnnotatedLength-len(tempBytes), paddingByte)
+			outBytes, _ = appendPaddingBytes(outBytes, relativeAnnotatedLength-currLength, paddingByte)
 		}
 
-		if isNegative {
-			outBytes = append(outBytes, tempBytes[1:]...)
-		} else {
-			outBytes = append(outBytes, tempBytes...)
-		}
+		outBytes = append(outBytes, tempBytes...)
 		currentByte += relativeAnnotatedLength
 
 	default:

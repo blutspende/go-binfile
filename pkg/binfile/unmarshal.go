@@ -42,7 +42,6 @@ func Unmarshal(inputBytes []byte, target interface{}, enc Encoding, tz Timezone,
 
 			case reflect.Struct:
 
-				//lastByte := currentByte
 				var processedBytes, err = internalUnmarshal(inputBytes[currentByte:], 0, outputTarget.Elem(), arrayTerminator, 1, enc, tz)
 				if err != nil {
 					return err
@@ -50,25 +49,18 @@ func Unmarshal(inputBytes []byte, target interface{}, enc Encoding, tz Timezone,
 
 				currentByte += processedBytes
 
-				// TODO: Y do we need this?
-				/*
-					if lastByte == currentByte {
-						return nil // no further progress
-					}
-				*/
-
 				targetValue = reflect.Append(targetValue, outputTarget.Elem())
 				reflect.ValueOf(target).Elem().Set(targetValue)
 
-				// top-level arrays are always terminator types - advance through
-				currentByte, _ = advanceThroughTerminator(inputBytes, currentByte, arrayTerminator)
-
-				if currentByte >= len(inputBytes) {
-					return nil // the end (do not move this lower in code, as the boundary check has to be first)
-				}
-
 			default:
 				return fmt.Errorf("invalid target - should be struct or slice of structs")
+			}
+
+			// top-level arrays are always terminator types - advance through
+			currentByte, _ = advanceThroughTerminator(inputBytes, currentByte, arrayTerminator)
+
+			if currentByte >= len(inputBytes) {
+				return nil // the end (do not move this lower in code, as the boundary check has to be first)
 			}
 		}
 
@@ -111,15 +103,15 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 			}
 			currentByte = newPos
 		}
-		/*
-			// Really useful debugging:
-			for k := 0; k < depth; k++ {
-				fmt.Print(" ")
-			}
-			fmt.Printf("Field %s (%d:%d) with at %d \n",
-				record.Type().Field(fieldNo).Name,
-				absoluteAnnotatedPos, relativeAnnotatedLength, currentByte)
-		*/
+
+		// Really useful debugging:
+		for k := 0; k < depth; k++ {
+			fmt.Print(" ")
+		}
+		fmt.Printf("Field %s (%d:%d) with at %d \n",
+			record.Type().Field(fieldNo).Name,
+			absoluteAnnotatedPos, relativeAnnotatedLength, currentByte)
+
 		var valueKind = reflect.TypeOf(recordField.Interface()).Kind()
 
 		if valueKind == reflect.Struct {
@@ -318,7 +310,7 @@ func unmarshalSimpleTypes(inputBytes []byte, currentByte int, recordField reflec
 			return currentByte, err
 		}
 
-		reflect.ValueOf(recordField.Addr().Interface()).Elem().Set(reflect.ValueOf(float32(num)))
+		reflect.ValueOf(recordField.Addr().Interface()).Elem().Set(reflect.ValueOf(float64(num)))
 
 	default:
 

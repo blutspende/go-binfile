@@ -29,6 +29,10 @@ func hasAnnotationPadspace(annotationList []string) bool {
 	return sliceContainsString(annotationList, "padspace")
 }
 
+func hasAnnotationForceSign(annotationList []string) bool {
+	return sliceContainsString(annotationList, "forcesign")
+}
+
 func getArrayAnnotation(annotationList []string) (string, bool) {
 
 	for i, val := range annotationList {

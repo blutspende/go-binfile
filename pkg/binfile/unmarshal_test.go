@@ -133,7 +133,7 @@ type testTopLevelArrayInnerUnmarshal struct {
 
 func TestUnmarshalTopLevelArray(t *testing.T) {
 
-	var inputData = []byte("ABCDEFxx  123456xx  \r")
+	var inputData = []byte("ABCDEFxx  \r123456xx  \r")
 	var err error
 
 	var result []testTopLevelArrayInnerUnmarshal
@@ -280,13 +280,12 @@ type testIntUnmarshal struct {
 	PaddedNegative          int `bin:":4"`
 	PaddedWithSpace         int `bin:":4,padspace"`
 	PaddedWithSpaceNegative int `bin:":4,padspace"`
+	ForceSign               int `bin:":4,forcesign"`
 }
-
-//IntFieldPadding int     `bin:":3,padzero"` TODO
 
 func TestUnmarshalInt(t *testing.T) {
 
-	var inputData = []byte("121234xx120012-2-002   3-  4")
+	var inputData = []byte("121234xx120012-2-002   3-  4+005")
 	var err error
 
 	var result testIntUnmarshal
@@ -301,6 +300,7 @@ func TestUnmarshalInt(t *testing.T) {
 	assert.Equal(t, -2, result.PaddedNegative)
 	assert.Equal(t, 3, result.PaddedWithSpace)
 	assert.Equal(t, -4, result.PaddedWithSpaceNegative)
+	assert.Equal(t, 5, result.ForceSign)
 }
 
 //
@@ -317,12 +317,13 @@ type testFloatUnmarshal struct {
 	PaddedWithSpace         float32 `bin:":6,padspace"`
 	PaddedWithSpaceNegative float32 `bin:":6,padspace"`
 	Precision               float32 `bin:":6,precision:2"` // setting the decimal places shouldn't affect reading. can cause loss of data
-	//BigNum         float64 `bin:":4"` TODO
+	ForceSign               float32 `bin:":4,forcesign"`
+	BigNum                  float64 `bin:":10"` // test if scientific notation works
 }
 
 func TestUnmarshalFloat(t *testing.T) {
 
-	var inputData = []byte("11.1.2xx1.23001.23-1.23-001.2  1.23-  1.2-1.234")
+	var inputData = []byte("11.1.2xx1.23001.23-1.23-001.2  1.23-  1.2-1.234+1.2+1.234E+10")
 	var err error
 
 	var result testFloatUnmarshal
@@ -339,6 +340,8 @@ func TestUnmarshalFloat(t *testing.T) {
 	assert.Equal(t, float32(1.23), result.PaddedWithSpace)
 	assert.Equal(t, float32(-1.2), result.PaddedWithSpaceNegative)
 	assert.Equal(t, float32(-1.234), result.Precision)
+	assert.Equal(t, float32(1.2), result.ForceSign)
+	assert.Equal(t, float64(12340000000), result.BigNum)
 }
 
 //

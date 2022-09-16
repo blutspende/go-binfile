@@ -1,6 +1,7 @@
 package binfile
 
 import (
+	"math"
 	"testing"
 
 	"github.com/google/uuid"
@@ -147,7 +148,7 @@ func TestMarshalTopLevelArray(t *testing.T) {
 	result, err := Marshal(inputData, 'x', EncodingUTF8, TimezoneUTC, "\r")
 	assert.Nil(t, err)
 
-	assert.Equal(t, []byte("ABCDEFxx  123456xx  \r"), result)
+	assert.Equal(t, []byte("ABCDEFxx  \r123456xx  \r"), result)
 }
 
 //
@@ -269,6 +270,7 @@ type testIntMarshal struct {
 	PaddedNegative          int `bin:":4"`
 	PaddedWithSpace         int `bin:":4,padspace"`
 	PaddedWithSpaceNegative int `bin:":4,padspace"`
+	ForceSign               int `bin:":4,forcesign"`
 }
 
 func TestMarshalInt(t *testing.T) {
@@ -282,12 +284,13 @@ func TestMarshalInt(t *testing.T) {
 		PaddedNegative:          -2,
 		PaddedWithSpace:         3,
 		PaddedWithSpaceNegative: -4,
+		ForceSign:               5,
 	}
 
 	result, err := Marshal(inputData, 'x', EncodingUTF8, TimezoneUTC, "\r")
 	assert.Nil(t, err)
 
-	assert.Equal(t, []byte("121234xx120012-2-002   3-  4"), result)
+	assert.Equal(t, []byte("121234xx120012-2-002   3-  4+005"), result)
 }
 
 //
@@ -304,14 +307,15 @@ type testFloatMarshal struct {
 	PaddedWithSpace         float32 `bin:":6,padspace"`
 	PaddedWithSpaceNegative float32 `bin:":6,padspace"`
 	Precision               float32 `bin:":7,precision:2,padspace"`
-	//BigNum         float64 `bin:":4"` // TODO
+	ForceSign               float32 `bin:":4,forcesign"`
+	BigNum                  float64 `bin:":12,precision:4,forcesign"`
 }
 
 func TestMarshalFloat(t *testing.T) {
 
 	var inputData = testFloatMarshal{
-		Length1:                 1,  // TODO: is '1' can be a float?
-		Length2:                 1., // TODO: is '1.' can be a float?
+		Length1:                 1,
+		Length2:                 1.,
 		Length3:                 1.2,
 		AbsPos:                  1.23,
 		Padded:                  1.23,
@@ -320,13 +324,14 @@ func TestMarshalFloat(t *testing.T) {
 		PaddedWithSpace:         1.23,
 		PaddedWithSpaceNegative: -1.2,
 		Precision:               -1.23456,
-		//BigNum:         math.MaxFloat32 + 1, // TODO: scientific notation?
+		ForceSign:               1.2,
+		BigNum:                  math.MaxFloat32 + 1,
 	}
 
 	var result, err = Marshal(inputData, 'x', EncodingUTF8, TimezoneUTC, "\r")
 	assert.Nil(t, err)
 
-	assert.Equal(t, []byte("11.1.2xx1.23001.23-1.23-001.2  1.23-  1.2-  1.23"), result)
+	assert.Equal(t, []byte("11.1.2xx1.23001.23-1.23-001.2  1.23-  1.2-  1.23+1.2+03.4028E+38"), result)
 }
 
 //
