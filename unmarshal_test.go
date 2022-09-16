@@ -1,6 +1,7 @@
 package binfile
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 
@@ -193,7 +194,8 @@ func TestUnmarshalUnanotatedFieldsAreSkipped(t *testing.T) {
 	var resultInvalid testUnannotatedInvalidUnmarshal
 	_ = resultInvalid.unexportedAnnotatedField // supress warning
 	err = Unmarshal(inputData, &resultInvalid, EncodingUTF8, TimezoneUTC, "")
-	assert.EqualError(t, err, "field 'unexportedAnnotatedField' is not exported but annotated")
+
+	assert.Equal(t, true, errors.Is(err, ErrorExportedFieldNotAnnotated))
 }
 
 //
@@ -233,13 +235,14 @@ func TestUnmarshalAddressing(t *testing.T) {
 
 	var resultInvalidAbsolutePos testInvalidAbsolutePositionUnmarshal
 	err = Unmarshal(inputData, &resultInvalidAbsolutePos, EncodingUTF8, TimezoneUTC, "\r")
-	assert.EqualError(t, err, "absolute position points out-of-bounds on field 'FieldInvalid' `14:2`", err.Error())
+	var errOutOfBounds *ErrorReadingOutOfBounds
+	assert.Equal(t, true, errors.Is(err, errOutOfBounds))
 
 	//-------------------------------------------------------------------------
 
 	var resultInvalidRelativeLength testInvalidRelativeLengthOOBUnmarshal
 	err = Unmarshal(inputData, &resultInvalidRelativeLength, EncodingUTF8, TimezoneUTC, "\r")
-	assert.EqualError(t, err, "error processing field 'FieldInvalid' `:14`: reading out of bounds position 14 in input data of 11 bytes", err.Error())
+	assert.Equal(t, true, errors.Is(err, errOutOfBounds))
 
 }
 
@@ -507,7 +510,9 @@ func TestUnmarshalDynamicArray(t *testing.T) {
 	var resultWrongType testDynamicArrayUnmarshalWrongType
 
 	err = Unmarshal([]byte(dataWrongType), &resultWrongType, EncodingUTF8, TimezoneUTC, "\r")
-	assert.EqualError(t, err, "invalid type for array size field 'Nope' - should be int")
+
+	var errUnsupportedType *ErrorUnsupportedType
+	assert.Equal(t, true, errors.Is(err, errUnsupportedType))
 
 	//-------------------------------------------------------------------------
 
@@ -515,7 +520,9 @@ func TestUnmarshalDynamicArray(t *testing.T) {
 	var resultWrongValue testDynamicArrayUnmarshalWrongValue
 
 	err = Unmarshal([]byte(dataWrongValue), &resultWrongValue, EncodingUTF8, TimezoneUTC, "\r")
-	assert.EqualError(t, err, "invalid size for array size field 'IncorrectSize'")
+
+	var errInvalidSize *ErrorInvalidSizeForArray
+	assert.Equal(t, true, errors.Is(err, errInvalidSize))
 
 	//-------------------------------------------------------------------------
 
@@ -523,5 +530,5 @@ func TestUnmarshalDynamicArray(t *testing.T) {
 	var resultNoField testDynamicArrayUnmarshalUnknownField
 
 	err = Unmarshal([]byte(dataNoField), &resultNoField, EncodingUTF8, TimezoneUTC, "")
-	assert.EqualError(t, err, "unknown field name for array size 'Hacaca'")
+	assert.Equal(t, true, errors.Is(err, ErrorUnknownFieldName))
 }

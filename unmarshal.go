@@ -2,7 +2,6 @@ package binfile
 
 import (
 	"errors"
-	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -11,9 +10,6 @@ import (
 //var ErrAbortArrayTerminator = fmt.Errorf("aborting due to array-terminator found")
 
 // var ErrInvalidAddressAnnotation = fmt.Errorf("invalid address annotation")
-var ErrAnnotatedFieldNotWritable = fmt.Errorf("annotated Field is not writable")
-
-var ErrFoundZeroValueBytes = errors.New("specified range is all zero value bytes")
 
 // Accepts a byte array that needs to be parsed and a reference to an annotated struct or array of sturcts to parse into.
 //
@@ -24,7 +20,7 @@ func Unmarshal(inputBytes []byte, target interface{}, enc Encoding, tz Timezone,
 
 	// only pointers allowed
 	if reflect.ValueOf(target).Kind() != reflect.Ptr {
-		return fmt.Errorf("unable to unmarshal %s of type %s", reflect.TypeOf(target).Name(), reflect.TypeOf(target))
+		return newUnsupportedTypeError(reflect.TypeOf(target))
 	}
 
 	var targetValue = reflect.ValueOf(target).Elem()
@@ -58,7 +54,7 @@ func Unmarshal(inputBytes []byte, target interface{}, enc Encoding, tz Timezone,
 				reflect.ValueOf(target).Elem().Set(targetValue)
 
 			default:
-				return fmt.Errorf("invalid target - should be struct or slice of structs")
+				return newUnsupportedTypeError(targetValue.Type())
 			}
 
 			// top-level arrays are always terminator types - advance through
@@ -70,7 +66,7 @@ func Unmarshal(inputBytes []byte, target interface{}, enc Encoding, tz Timezone,
 		}
 
 	default:
-		return fmt.Errorf("unable to unmarshal %s of type %s", reflect.TypeOf(target).Name(), reflect.TypeOf(target))
+		return newUnsupportedTypeError(reflect.TypeOf(target))
 	}
 
 }
@@ -87,7 +83,7 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 		var binTag = record.Type().Field(fieldNo).Tag.Get("bin")
 		if !recordField.CanInterface() {
 			if binTag != "" {
-				return currentByte, fmt.Errorf("field '%s' is not exported but annotated", record.Type().Field(fieldNo).Name)
+				return currentByte, newProcessingFieldError(record.Type().Field(fieldNo).Name, binTag, ErrorExportedFieldNotAnnotated)
 			} else {
 				continue // TODO: this won't notify you about accidentally not exported nested structs
 			}
@@ -97,14 +93,14 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 
 		absoluteAnnotatedPos, relativeAnnotatedLength, hasAnnotatedAddress, err := getAddressAnnotation(annotationList)
 		if err != nil {
-			return currentByte, fmt.Errorf("invalid address annotation field '%s' `%s`: %w", record.Type().Field(fieldNo).Name, binTag, err)
+			return currentByte, newProcessingFieldError(record.Type().Field(fieldNo).Name, binTag, newInvalidAddressAnnotationError(err))
 		}
 
 		if hasAnnotatedAddress && absoluteAnnotatedPos > 0 {
 			// The current field has an absolute Address. This causes the cursor to be forwarded
 			var newPos = initialStartByte + absoluteAnnotatedPos
 			if len(inputBytes)-initialStartByte < newPos {
-				return currentByte, fmt.Errorf("absolute position points out-of-bounds on field '%s' `%s`", record.Type().Field(fieldNo).Name, binTag)
+				return currentByte, newProcessingFieldError(record.Type().Field(fieldNo).Name, binTag, newReadingOutOfBoundsError(newPos, newPos+relativeAnnotatedLength, len(inputBytes)-initialStartByte))
 			}
 			currentByte = newPos
 		}
@@ -124,7 +120,7 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 			var err error
 			currentByte, err = internalUnmarshal(inputBytes, currentByte, recordField, arrayTerminator, depth+1, enc, tz)
 			if err != nil { // If the nested structure did fail, then bail out
-				return currentByte, err
+				return currentByte, newProcessingFieldError(record.Type().Field(fieldNo).Name, binTag, err)
 			}
 
 			continue
@@ -138,12 +134,12 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 
 			var arrayAnnotation, hasArrayAnnotation = getArrayAnnotation(annotationList)
 			if !hasArrayAnnotation {
-				return currentByte, fmt.Errorf("error processing field '%s' `%s`: %w", record.Type().Field(fieldNo).Name, binTag, fmt.Errorf("array fields must have an array annotation"))
+				return currentByte, newProcessingFieldError(record.Type().Field(fieldNo).Name, binTag, ErrorMissingArrayAnnotation)
 			}
 
 			var targetKind = reflect.TypeOf(recordField.Interface()).Elem().Kind()
 			if targetKind != reflect.Struct && !hasAnnotatedAddress {
-				return currentByte, fmt.Errorf("error processing field '%s' `%s`: %w", record.Type().Field(fieldNo).Name, binTag, fmt.Errorf("non-struct field must have address annotation"))
+				return currentByte, newProcessingFieldError(record.Type().Field(fieldNo).Name, binTag, ErrorMissingAddressAnnotation)
 			}
 
 			var arraySize = -1
@@ -154,7 +150,7 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 				} else if fieldName, isDynamic := getArraySizeFieldName(arrayAnnotation); isDynamic {
 					arraySize, err = resolveDynamicArraySize(record, fieldName)
 					if err != nil {
-						return currentByte, err
+						return currentByte, newProcessingFieldError(record.Type().Field(fieldNo).Name, binTag, newInvalidDynamicArraySizeError(record.Type().Name(), fieldName, err))
 					}
 				}
 			}
@@ -181,20 +177,20 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 
 					currentByte, err = internalUnmarshal(inputBytes, currentByte, outputTarget.Elem(), arrayTerminator, depth+1, enc, tz)
 					if err != nil {
-						if !isTerminatorType && errors.Is(err, ErrFoundZeroValueBytes) {
+						if !isTerminatorType && errors.Is(err, ErrorFoundZeroValueBytes) {
 							continue
 						}
-						return currentByte, err
+						return currentByte, newProcessingFieldError(record.Type().Field(fieldNo).Name, binTag, err)
 					}
 
 				default:
 
 					currentByte, err = unmarshalSimpleTypes(inputBytes, currentByte, outputTarget.Elem(), relativeAnnotatedLength, annotationList, depth+1, enc, tz)
 					if err != nil {
-						if !isTerminatorType && errors.Is(err, ErrFoundZeroValueBytes) {
+						if !isTerminatorType && errors.Is(err, ErrorFoundZeroValueBytes) {
 							continue
 						}
-						return currentByte, fmt.Errorf("error processing field '%s' `%s`: %w", record.Type().Field(fieldNo).Name, binTag, err)
+						return currentByte, newProcessingFieldError(record.Type().Field(fieldNo).Name, binTag, err)
 					}
 				}
 
@@ -223,12 +219,12 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 		}
 
 		if !hasAnnotatedAddress {
-			return currentByte, fmt.Errorf("error processing field '%s' `%s`: %w", record.Type().Field(fieldNo).Name, binTag, fmt.Errorf("non-struct field must have address annotation"))
+			return currentByte, newProcessingFieldError(record.Type().Field(fieldNo).Name, binTag, ErrorMissingAddressAnnotation)
 		}
 
 		currentByte, err = unmarshalSimpleTypes(inputBytes, currentByte, recordField, relativeAnnotatedLength, annotationList, depth+1, enc, tz)
 		if err != nil {
-			return currentByte, fmt.Errorf("error processing field '%s' `%s`: %w", record.Type().Field(fieldNo).Name, binTag, err)
+			return currentByte, newProcessingFieldError(record.Type().Field(fieldNo).Name, binTag, err)
 		}
 	}
 
@@ -241,7 +237,7 @@ func unmarshalSimpleTypes(inputBytes []byte, currentByte int, recordField reflec
 	if relativeAnnotatedLength > 0 {
 		// Having a length, the total length is not supposed to exceed the boundaries of the input
 		if currentByte+relativeAnnotatedLength-1 > len(inputBytes) {
-			return currentByte, fmt.Errorf("reading out of bounds position %d in input data of %d bytes", currentByte+relativeAnnotatedLength, len(inputBytes))
+			return currentByte, newReadingOutOfBoundsError(currentByte, currentByte+relativeAnnotatedLength, len(inputBytes))
 		}
 	}
 
@@ -250,16 +246,16 @@ func unmarshalSimpleTypes(inputBytes []byte, currentByte int, recordField reflec
 		byteSum += int(val)
 	}
 	if byteSum == 0 {
-		return currentByte + relativeAnnotatedLength, ErrFoundZeroValueBytes
+		return currentByte + relativeAnnotatedLength, ErrorFoundZeroValueBytes
+	}
+
+	if !recordField.CanSet() {
+		return currentByte, ErrorAnnotatedFieldNotWritable
 	}
 
 	var valueKind = reflect.TypeOf(recordField.Interface()).Kind()
 	switch valueKind {
 	case reflect.String:
-
-		if !recordField.CanSet() {
-			return currentByte, ErrAnnotatedFieldNotWritable
-		}
 
 		strvalue := string(inputBytes[currentByte : currentByte+relativeAnnotatedLength])
 		currentByte += relativeAnnotatedLength
@@ -320,8 +316,7 @@ func unmarshalSimpleTypes(inputBytes []byte, currentByte int, recordField reflec
 
 	default:
 
-		return currentByte, fmt.Errorf("unsupported field type '%s'", valueKind)
-
+		return currentByte, newUnsupportedTypeError(reflect.TypeOf(recordField.Interface()))
 	}
 
 	return currentByte, nil

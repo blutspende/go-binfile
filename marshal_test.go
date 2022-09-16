@@ -1,6 +1,7 @@
 package binfile
 
 import (
+	"errors"
 	"math"
 	"testing"
 
@@ -193,7 +194,7 @@ func TestMarshalUnanotatedFieldsAreSkipped(t *testing.T) {
 	_ = inputInvalid.unexportedAnnotatedField
 	result, err = Marshal(inputInvalid, ' ', EncodingUTF8, TimezoneUTC, "\r")
 	_ = result
-	assert.EqualError(t, err, "field 'unexportedAnnotatedField' is not exported but annotated")
+	assert.Equal(t, true, errors.Is(err, ErrorExportedFieldNotAnnotated))
 }
 
 //
@@ -230,7 +231,8 @@ func TestMarshalAddressing(t *testing.T) {
 	var inputDataInvalid testInvalidAbsolutePositionMarshal
 	resultInvalid, err := Marshal(inputDataInvalid, 'x', EncodingUTF8, TimezoneEuropeBerlin, "\r")
 	_ = resultInvalid
-	assert.EqualError(t, err, "absoulute position points backwards 'FieldInvalid' `1:2`")
+	var e *ErrorInvalidOffset
+	assert.Equal(t, true, errors.Is(err, e))
 }
 
 //
@@ -490,7 +492,8 @@ func TestMasrshalDynamicArray(t *testing.T) {
 
 	result, err = Marshal(inputDataWrongType, 'x', EncodingUTF8, TimezoneUTC, "\r")
 	_ = result
-	assert.EqualError(t, err, "invalid type for array size field 'Nope' - should be int")
+	var errUnsupportedType *ErrorUnsupportedType
+	assert.Equal(t, true, errors.Is(err, errUnsupportedType))
 
 	//-------------------------------------------------------------------------
 
@@ -501,7 +504,8 @@ func TestMasrshalDynamicArray(t *testing.T) {
 
 	result, err = Marshal(inputDataWrongValue, 'x', EncodingUTF8, TimezoneUTC, "\r")
 	_ = result
-	assert.EqualError(t, err, "invalid size for array size field 'IncorrectSize'")
+	var errInvalidSize *ErrorInvalidSizeForArray
+	assert.Equal(t, true, errors.Is(err, errInvalidSize))
 
 	//-------------------------------------------------------------------------
 
@@ -512,5 +516,5 @@ func TestMasrshalDynamicArray(t *testing.T) {
 
 	result, err = Marshal(inputDataNoField, 'x', EncodingUTF8, TimezoneUTC, "\r")
 	_ = result
-	assert.EqualError(t, err, "unknown field name for array size 'Hacaca'")
+	assert.Equal(t, true, errors.Is(err, ErrorUnknownFieldName))
 }

@@ -1,7 +1,6 @@
 package binfile
 
 import (
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -146,7 +145,7 @@ func readAddressAnnotation(str string) (int, int, error) {
 	if len(parts) >= 1 { // the 1st part is the absolute address
 		if parts[0] != "" {
 			if abs, err = strconv.Atoi(parts[0]); err != nil {
-				return -1, -1, fmt.Errorf("invalid absolute position value '%v': %w", parts[0], err)
+				return -1, -1, newInvalidAbsolutePositionError(err)
 			}
 		}
 	}
@@ -154,7 +153,7 @@ func readAddressAnnotation(str string) (int, int, error) {
 	if len(parts) >= 2 { // the 2nd part is the length of the field
 		if parts[1] != "" {
 			if length, err = strconv.Atoi(parts[1]); err != nil {
-				return -1, -1, fmt.Errorf("invalid relative length value '%v': %w", parts[1], err)
+				return -1, -1, newInvalidRelativeLengthError(err)
 			}
 		}
 	}
@@ -180,7 +179,7 @@ func getPrecisionFromAnnotation(annotationList []string) (int, error) {
 				return precision, nil
 			}
 
-			return -1, fmt.Errorf("invalid precision given '%s'", vals[1])
+			return -1, newInvalidPrecisionError(vals[1])
 		}
 	}
 

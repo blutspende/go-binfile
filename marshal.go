@@ -1,7 +1,6 @@
 package binfile
 
 import (
-	"fmt"
 	"reflect"
 	"strconv"
 )
@@ -44,7 +43,7 @@ func Marshal(target interface{}, padding byte, enc Encoding, tz Timezone, arrayT
 				outBytes = append(outBytes, tempBytes...)
 
 			default:
-				return []byte{}, fmt.Errorf("invalid target - should be struct or slice of structs")
+				return []byte{}, newUnsupportedTypeError(reflect.TypeOf(targetValue.Interface()))
 			}
 
 			// for separating messages
@@ -59,7 +58,7 @@ func Marshal(target interface{}, padding byte, enc Encoding, tz Timezone, arrayT
 
 	}
 
-	return []byte{}, fmt.Errorf("invalid target - should be struct or slice of structs")
+	return []byte{}, newUnsupportedTypeError(targetValue.Type())
 }
 
 // use this for recursion
@@ -74,7 +73,7 @@ func internalMarshal(record reflect.Value, onlyPaddWithZeros bool, padding byte,
 		var binTag = record.Type().Field(fieldNo).Tag.Get("bin")
 		if !recordField.CanInterface() {
 			if binTag != "" {
-				return []byte{}, currentByte, fmt.Errorf("field '%s' is not exported but annotated", record.Type().Field(fieldNo).Name)
+				return []byte{}, currentByte, newProcessingFieldError(record.Type().Field(fieldNo).Name, binTag, ErrorExportedFieldNotAnnotated)
 			} else {
 				continue // TODO: this won't notify you about accidentally not exported nested structs
 			}
@@ -84,14 +83,14 @@ func internalMarshal(record reflect.Value, onlyPaddWithZeros bool, padding byte,
 
 		absoluteAnnotatedPos, relativeAnnotatedLength, hasAnnotatedAddress, err := getAddressAnnotation(annotationList)
 		if err != nil {
-			return []byte{}, currentByte, fmt.Errorf("invalid address annotation field '%s' `%s`: %w", record.Type().Field(fieldNo).Name, binTag, err)
+			return []byte{}, currentByte, newProcessingFieldError(record.Type().Field(fieldNo).Name, binTag, newInvalidAddressAnnotationError(err))
 		}
 
 		if absoluteAnnotatedPos != -1 {
 			if currentByte < absoluteAnnotatedPos {
 				outBytes, currentByte = appendPaddingBytes(outBytes, absoluteAnnotatedPos-currentByte, padding)
 			} else if currentByte > absoluteAnnotatedPos {
-				return []byte{}, currentByte, fmt.Errorf("absoulute position points backwards '%s' `%s`", record.Type().Field(fieldNo).Name, binTag)
+				return []byte{}, currentByte, newProcessingFieldError(record.Type().Field(fieldNo).Name, binTag, newInvalidInvalidOffsetError(currentByte, absoluteAnnotatedPos))
 			}
 		}
 		/*
@@ -109,7 +108,7 @@ func internalMarshal(record reflect.Value, onlyPaddWithZeros bool, padding byte,
 			var err error
 			tempOutByte, currentByte, err = internalMarshal(recordField, onlyPaddWithZeros, padding, arrayTerminator, currentByte, depth+1)
 			if err != nil { // If the nested structure did fail, then bail out
-				return []byte{}, currentByte, err
+				return []byte{}, currentByte, newProcessingFieldError(record.Type().Field(fieldNo).Name, binTag, err)
 			}
 
 			outBytes = append(outBytes, tempOutByte...)
@@ -125,14 +124,14 @@ func internalMarshal(record reflect.Value, onlyPaddWithZeros bool, padding byte,
 
 			var arrayAnnotation, hasArrayAnnotation = getArrayAnnotation(annotationList)
 			if !hasArrayAnnotation {
-				return []byte{}, currentByte, fmt.Errorf("error processing field '%s' `%s`: %w", record.Type().Field(fieldNo).Name, binTag, fmt.Errorf("array fields must have an array annotation"))
+				return []byte{}, currentByte, newProcessingFieldError(record.Type().Field(fieldNo).Name, binTag, ErrorMissingArrayAnnotation)
 			}
 
 			var sliceValue = reflect.ValueOf(recordField.Interface())
 			var innerValueKind = reflect.TypeOf(recordField.Interface()).Elem().Kind()
 
 			if innerValueKind != reflect.Struct && !hasAnnotatedAddress {
-				return []byte{}, currentByte, fmt.Errorf("error processing field '%s' `%s`: %w", record.Type().Field(fieldNo).Name, binTag, fmt.Errorf("non-struct field must have address annotation"))
+				return []byte{}, currentByte, newProcessingFieldError(record.Type().Field(fieldNo).Name, binTag, ErrorMissingAddressAnnotation)
 			}
 
 			var arraySize = sliceValue.Len()
@@ -143,7 +142,7 @@ func internalMarshal(record reflect.Value, onlyPaddWithZeros bool, padding byte,
 				} else if fieldName, isDynamic := getArraySizeFieldName(arrayAnnotation); isDynamic {
 					arraySize, err = resolveDynamicArraySize(record, fieldName)
 					if err != nil {
-						return []byte{}, currentByte, err
+						return []byte{}, currentByte, newProcessingFieldError(record.Type().Field(fieldNo).Name, binTag, newInvalidDynamicArraySizeError(record.Type().Name(), fieldName, err))
 					}
 				}
 			}
@@ -165,7 +164,7 @@ func internalMarshal(record reflect.Value, onlyPaddWithZeros bool, padding byte,
 
 					tempOutByte, currentByte, err = internalMarshal(currentElement, onlyPaddWithZeros, padding, arrayTerminator, currentByte, depth+1)
 					if err != nil {
-						return []byte{}, currentByte, err
+						return []byte{}, currentByte, newProcessingFieldError(record.Type().Field(fieldNo).Name, binTag, err)
 					}
 					outBytes = append(outBytes, tempOutByte...)
 
@@ -173,7 +172,7 @@ func internalMarshal(record reflect.Value, onlyPaddWithZeros bool, padding byte,
 
 					tempOutByte, currentByte, err = marshalSimpleTypes(currentElement, onlyPaddWithZeros, relativeAnnotatedLength, annotationList, currentByte, depth)
 					if err != nil {
-						return []byte{}, currentByte, fmt.Errorf("error processing field %s: %w", record.Type().Field(fieldNo).Name, err)
+						return []byte{}, currentByte, newProcessingFieldError(record.Type().Field(fieldNo).Name, binTag, err)
 					}
 					outBytes = append(outBytes, tempOutByte...)
 				}
@@ -191,13 +190,13 @@ func internalMarshal(record reflect.Value, onlyPaddWithZeros bool, padding byte,
 		}
 
 		if !hasAnnotatedAddress {
-			return []byte{}, currentByte, fmt.Errorf("error processing field '%s' `%s`: %w", record.Type().Field(fieldNo).Name, binTag, fmt.Errorf("non-struct field must have address annotation"))
+			return []byte{}, currentByte, newProcessingFieldError(record.Type().Field(fieldNo).Name, binTag, ErrorMissingAddressAnnotation)
 		}
 
 		var tempOutByte []byte
 		tempOutByte, currentByte, err = marshalSimpleTypes(recordField, onlyPaddWithZeros, relativeAnnotatedLength, annotationList, currentByte, depth)
 		if err != nil {
-			return []byte{}, currentByte, fmt.Errorf("error processing field '%s' `%s`: %w", record.Type().Field(fieldNo).Name, binTag, err)
+			return []byte{}, currentByte, newProcessingFieldError(record.Type().Field(fieldNo).Name, binTag, err)
 		}
 		outBytes = append(outBytes, tempOutByte...)
 
@@ -221,7 +220,7 @@ func marshalSimpleTypes(recordField reflect.Value, onlyPaddWithZeros bool, relat
 
 		var tempBytes = []byte(recordField.String())
 		if len(tempBytes) > relativeAnnotatedLength {
-			return []byte{}, currentByte, fmt.Errorf("invalid value length '%d'", len(tempBytes))
+			return []byte{}, currentByte, newInvalidValueLengthError(string(tempBytes), len(tempBytes))
 		} else if len(tempBytes) < relativeAnnotatedLength {
 			outBytes, _ = appendPaddingBytes(outBytes, relativeAnnotatedLength-len(tempBytes), byte(' '))
 		}
@@ -234,7 +233,7 @@ func marshalSimpleTypes(recordField reflect.Value, onlyPaddWithZeros bool, relat
 		// checks overflow - if system uses int32 as default
 		var tempInt = int(recordField.Int())
 		if int64(tempInt) != recordField.Int() {
-			return []byte{}, currentByte, fmt.Errorf("int conversion overflow 32 vs 64 bit system")
+			return []byte{}, currentByte, ErrorIntConversionOverflow
 		}
 
 		var isSignForced = hasAnnotationForceSign(annotationList)
@@ -256,7 +255,7 @@ func marshalSimpleTypes(recordField reflect.Value, onlyPaddWithZeros bool, relat
 		}
 
 		if currLength > relativeAnnotatedLength {
-			return []byte{}, currentByte, fmt.Errorf("invalid value length '%d'", currLength)
+			return []byte{}, currentByte, newInvalidValueLengthError(string(append(outBytes, tempBytes...)), currLength)
 		} else if currLength < relativeAnnotatedLength {
 			var paddingByte byte
 			if hasAnnotationPadspace(annotationList) {
@@ -310,7 +309,7 @@ func marshalSimpleTypes(recordField reflect.Value, onlyPaddWithZeros bool, relat
 		}
 
 		if currLength > relativeAnnotatedLength {
-			return []byte{}, currentByte, fmt.Errorf("invalid value length '%d'", currLength)
+			return []byte{}, currentByte, newInvalidValueLengthError(string(append(outBytes, tempBytes...)), currLength)
 		} else if currLength < relativeAnnotatedLength {
 			var paddingByte byte
 			if hasAnnotationPadspace(annotationList) {
@@ -325,8 +324,8 @@ func marshalSimpleTypes(recordField reflect.Value, onlyPaddWithZeros bool, relat
 		currentByte += relativeAnnotatedLength
 
 	default:
-		return []byte{}, currentByte, fmt.Errorf("unsupported field type '%s'", valueKind)
 
+		return []byte{}, currentByte, newUnsupportedTypeError(reflect.TypeOf(recordField.Interface()))
 	}
 
 	return outBytes, currentByte, nil
