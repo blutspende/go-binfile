@@ -37,9 +37,11 @@ func TestUnmarshalGeneralStructure(t *testing.T) {
 	inputData := []byte("D 03116506 044760722905768    E61     6.40  62      935  ")
 
 	var result testGeneralStructureUnmarshal
-	err := Unmarshal(inputData, &result, EncodingUTF8, TimezoneUTC, "\r")
+	position, err := Unmarshal(inputData, &result, EncodingUTF8, TimezoneUTC, "\r")
 
 	assert.Nil(t, err)
+	assert.Equal(t, len(inputData), position)
+
 	assert.Equal(t, "D ", result.RecordType)
 	assert.Equal(t, 3, result.UnitNo)
 	assert.Equal(t, 1165, result.RackNumber)
@@ -75,9 +77,10 @@ func TestUnmarshalMultipleRecords(t *testing.T) {
 	inputData := []byte("D 03116506 044760722905768    E61     6.40  62      935  \u000DD 03116507 044860722905758    E61     6.86  62      883  ")
 
 	var result testMultipleRecordsUnmarshal
-	err := Unmarshal(inputData, &result, EncodingUTF8, TimezoneUTC, "\r")
+	position, err := Unmarshal(inputData, &result, EncodingUTF8, TimezoneUTC, "\r")
 
-	assert.Equal(t, nil, err)
+	assert.Nil(t, err)
+	assert.Equal(t, len(inputData), position)
 
 	assert.Equal(t, 2, len(result.DMessage))
 
@@ -135,11 +138,12 @@ type testTopLevelArrayInnerUnmarshal struct {
 func TestUnmarshalTopLevelArray(t *testing.T) {
 
 	var inputData = []byte("ABCDEFxx  \r123456xx  \r")
-	var err error
 
 	var result []testTopLevelArrayInnerUnmarshal
-	err = Unmarshal(inputData, &result, EncodingUTF8, TimezoneUTC, "\r")
+	position, err := Unmarshal(inputData, &result, EncodingUTF8, TimezoneUTC, "\r")
+
 	assert.Nil(t, err)
+	assert.Equal(t, len(inputData), position)
 
 	assert.Equal(t, 2, len(result))
 
@@ -176,11 +180,12 @@ type testUnannotatedInvalidUnmarshal struct {
 func TestUnmarshalUnanotatedFieldsAreSkipped(t *testing.T) {
 
 	var inputData = []byte("1234")
-	var err error
 
 	var resultValid testUnannotatedValidUnmarshal
-	err = Unmarshal(inputData, &resultValid, EncodingUTF8, TimezoneUTC, "")
+	position, err := Unmarshal(inputData, &resultValid, EncodingUTF8, TimezoneUTC, "")
+
 	assert.Nil(t, err)
+	assert.Equal(t, len(inputData), position)
 
 	// Check that it didnt touch our not-annotated field
 	assert.Equal(t, uuid.UUID{}, resultValid.UnannotatedForeignStructre)
@@ -193,9 +198,10 @@ func TestUnmarshalUnanotatedFieldsAreSkipped(t *testing.T) {
 
 	var resultInvalid testUnannotatedInvalidUnmarshal
 	_ = resultInvalid.unexportedAnnotatedField // supress warning
-	err = Unmarshal(inputData, &resultInvalid, EncodingUTF8, TimezoneUTC, "")
+	position, err = Unmarshal(inputData, &resultInvalid, EncodingUTF8, TimezoneUTC, "")
 
 	assert.Equal(t, true, errors.Is(err, ErrorExportedFieldNotAnnotated))
+	assert.Equal(t, 0, position)
 }
 
 //
@@ -223,8 +229,10 @@ func TestUnmarshalAddressing(t *testing.T) {
 	var err error
 
 	var resultValid testValidAddressingUnmarshal
-	err = Unmarshal(inputData, &resultValid, EncodingUTF8, TimezoneUTC, "\r")
+	position, err := Unmarshal(inputData, &resultValid, EncodingUTF8, TimezoneUTC, "\r")
+
 	assert.Nil(t, err)
+	assert.Equal(t, len(inputData), position)
 
 	assert.Equal(t, "12", resultValid.Field1)
 	assert.Equal(t, "34", resultValid.Field2)
@@ -234,15 +242,18 @@ func TestUnmarshalAddressing(t *testing.T) {
 	//-------------------------------------------------------------------------
 
 	var resultInvalidAbsolutePos testInvalidAbsolutePositionUnmarshal
-	err = Unmarshal(inputData, &resultInvalidAbsolutePos, EncodingUTF8, TimezoneUTC, "\r")
+	position, err = Unmarshal(inputData, &resultInvalidAbsolutePos, EncodingUTF8, TimezoneUTC, "\r")
+
 	var errOutOfBounds *ErrorReadingOutOfBounds
 	assert.Equal(t, true, errors.Is(err, errOutOfBounds))
+	assert.Equal(t, 2, position)
 
 	//-------------------------------------------------------------------------
 
 	var resultInvalidRelativeLength testInvalidRelativeLengthOOBUnmarshal
-	err = Unmarshal(inputData, &resultInvalidRelativeLength, EncodingUTF8, TimezoneUTC, "\r")
+	position, err = Unmarshal(inputData, &resultInvalidRelativeLength, EncodingUTF8, TimezoneUTC, "\r")
 	assert.Equal(t, true, errors.Is(err, errOutOfBounds))
+	assert.Equal(t, 0, position)
 
 }
 
@@ -262,8 +273,10 @@ func TestUnmarshalString(t *testing.T) {
 	var err error
 
 	var result testStringUnmarshal
-	err = Unmarshal(inputData, &result, EncodingUTF8, TimezoneUTC, "\r")
+	position, err := Unmarshal(inputData, &result, EncodingUTF8, TimezoneUTC, "\r")
+
 	assert.Nil(t, err)
+	assert.Equal(t, len(inputData), position)
 
 	assert.Equal(t, "12", result.SomeField1)
 	assert.Equal(t, "3456", result.SomeField2)
@@ -292,8 +305,10 @@ func TestUnmarshalInt(t *testing.T) {
 	var err error
 
 	var result testIntUnmarshal
-	err = Unmarshal(inputData, &result, EncodingUTF8, TimezoneUTC, "\r")
+	position, err := Unmarshal(inputData, &result, EncodingUTF8, TimezoneUTC, "\r")
+
 	assert.Nil(t, err)
+	assert.Equal(t, len(inputData), position)
 
 	assert.Equal(t, 12, result.Length1)
 	assert.Equal(t, 1234, result.Length2)
@@ -330,8 +345,10 @@ func TestUnmarshalFloat(t *testing.T) {
 	var err error
 
 	var result testFloatUnmarshal
-	err = Unmarshal(inputData, &result, EncodingUTF8, TimezoneUTC, "\r")
+	position, err := Unmarshal(inputData, &result, EncodingUTF8, TimezoneUTC, "\r")
+
 	assert.Nil(t, err)
+	assert.Equal(t, len(inputData), position)
 
 	assert.Equal(t, float32(1), result.Length1)
 	assert.Equal(t, float32(1), result.Length2)
@@ -363,8 +380,10 @@ func TestUnmarsalNestedStruct(t *testing.T) {
 	var err error
 
 	var result testNestedStructUnmarshal
-	err = Unmarshal(inputData, &result, EncodingUTF8, TimezoneUTC, "\r")
+	position, err := Unmarshal(inputData, &result, EncodingUTF8, TimezoneUTC, "\r")
+
 	assert.Nil(t, err)
+	assert.Equal(t, len(inputData), position)
 
 	assert.Equal(t, 1, result.Anything)
 	assert.Equal(t, 2, result.NestedStruct.SomethingNested)
@@ -388,8 +407,10 @@ func TestUnmarshalTerminatedArrays(t *testing.T) {
 	var inputData = []byte("1234\r0123\r")
 
 	var result testArrayUnmarshal
-	var err = Unmarshal(inputData, &result, EncodingUTF8, TimezoneUTC, "\r")
+	position, err := Unmarshal(inputData, &result, EncodingUTF8, TimezoneUTC, "\r")
+
 	assert.Nil(t, err)
+	assert.Equal(t, len(inputData), position)
 
 	assert.Equal(t, 2, len(result.MoreElements))
 	assert.Equal(t, 1, result.MoreElements[0].InnerData1)
@@ -417,8 +438,10 @@ func TestUnmarshalArrayWithFixedLength(t *testing.T) {
 	var dataExactSize = "AA0BB1CC20123"
 
 	var readExactSize testFixedSizeArrayUnmarshal
-	err := Unmarshal([]byte(dataExactSize), &readExactSize, EncodingUTF8, TimezoneUTC, "")
+	position, err := Unmarshal([]byte(dataExactSize), &readExactSize, EncodingUTF8, TimezoneUTC, "")
+
 	assert.Nil(t, err)
+	assert.Equal(t, len(dataExactSize), position)
 
 	var expectedExactSizeInner = []testFixedSizeArrayInnerUnmarshal{
 		{JustAField: "AA", AndAnother: 0},
@@ -434,8 +457,10 @@ func TestUnmarshalArrayWithFixedLength(t *testing.T) {
 	var dataZeroPadded = "AA0BB1\x00\x00\x0001\x00\x00"
 
 	var readZeroPadded testFixedSizeArrayUnmarshal
-	err = Unmarshal([]byte(dataZeroPadded), &readZeroPadded, EncodingUTF8, TimezoneUTC, "")
+	position, err = Unmarshal([]byte(dataZeroPadded), &readZeroPadded, EncodingUTF8, TimezoneUTC, "")
+
 	assert.Nil(t, err)
+	assert.Equal(t, len(dataZeroPadded), position)
 
 	var expectedZeroPaddedInner = []testFixedSizeArrayInnerUnmarshal{
 		{JustAField: "AA", AndAnother: 0},
@@ -450,8 +475,10 @@ func TestUnmarshalArrayWithFixedLength(t *testing.T) {
 	var dataWithTerminator = "AA0BB1CC2\u000D0123"
 
 	var readWithTerminator testFixedSizeArrayUnmarshal
-	err = Unmarshal([]byte(dataWithTerminator), &readWithTerminator, EncodingUTF8, TimezoneUTC, "\r")
+	position, err = Unmarshal([]byte(dataWithTerminator), &readWithTerminator, EncodingUTF8, TimezoneUTC, "\r")
+
 	assert.Nil(t, err)
+	assert.Equal(t, len(dataWithTerminator), position)
 
 	var expectedWithTerminatorInner = []testFixedSizeArrayInnerUnmarshal{
 		{JustAField: "AA", AndAnother: 0},
@@ -496,8 +523,10 @@ func TestUnmarshalDynamicArray(t *testing.T) {
 	var data = "A3-1012"
 	var result testDynamicArrayUnmarshal
 
-	err = Unmarshal([]byte(data), &result, EncodingUTF8, TimezoneUTC, "\r")
+	position, err := Unmarshal([]byte(data), &result, EncodingUTF8, TimezoneUTC, "\r")
+
 	assert.Nil(t, err)
+	assert.Equal(t, len(data), position)
 
 	assert.Equal(t, "A", result.Nope)
 	assert.Equal(t, 3, result.CorrectSize)
@@ -509,26 +538,29 @@ func TestUnmarshalDynamicArray(t *testing.T) {
 	var dataWrongType = "A012"
 	var resultWrongType testDynamicArrayUnmarshalWrongType
 
-	err = Unmarshal([]byte(dataWrongType), &resultWrongType, EncodingUTF8, TimezoneUTC, "\r")
+	position, err = Unmarshal([]byte(dataWrongType), &resultWrongType, EncodingUTF8, TimezoneUTC, "\r")
 
 	var errUnsupportedType *ErrorUnsupportedType
 	assert.Equal(t, true, errors.Is(err, errUnsupportedType))
+	assert.Equal(t, 1, position)
 
 	//-------------------------------------------------------------------------
 
 	var dataWrongValue = "-1012"
 	var resultWrongValue testDynamicArrayUnmarshalWrongValue
 
-	err = Unmarshal([]byte(dataWrongValue), &resultWrongValue, EncodingUTF8, TimezoneUTC, "\r")
+	position, err = Unmarshal([]byte(dataWrongValue), &resultWrongValue, EncodingUTF8, TimezoneUTC, "\r")
 
 	var errInvalidSize *ErrorInvalidSizeForArray
 	assert.Equal(t, true, errors.Is(err, errInvalidSize))
+	assert.Equal(t, 2, position)
 
 	//-------------------------------------------------------------------------
 
 	var dataNoField = "A012"
 	var resultNoField testDynamicArrayUnmarshalUnknownField
 
-	err = Unmarshal([]byte(dataNoField), &resultNoField, EncodingUTF8, TimezoneUTC, "")
+	position, err = Unmarshal([]byte(dataNoField), &resultNoField, EncodingUTF8, TimezoneUTC, "")
 	assert.Equal(t, true, errors.Is(err, ErrorUnknownFieldName))
+	assert.Equal(t, 1, position)
 }

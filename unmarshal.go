@@ -16,19 +16,18 @@ import (
 // Returns an error if a problem found or nil. The parsed contents will be in the provided 'target'.
 //
 // Check the README.md for usage.
-func Unmarshal(inputBytes []byte, target interface{}, enc Encoding, tz Timezone, arrayTerminator string) error {
+func Unmarshal(inputBytes []byte, target interface{}, enc Encoding, tz Timezone, arrayTerminator string) (int, error) {
 
 	// only pointers allowed
 	if reflect.ValueOf(target).Kind() != reflect.Ptr {
-		return newUnsupportedTypeError(reflect.TypeOf(target))
+		return 0, newUnsupportedTypeError(reflect.TypeOf(target))
 	}
 
 	var targetValue = reflect.ValueOf(target).Elem()
 	var targetKind = targetValue.Kind()
 	switch targetKind {
 	case reflect.Struct:
-		_, err := internalUnmarshal(inputBytes, 0, targetValue, arrayTerminator, 1, enc, tz)
-		return err
+		return internalUnmarshal(inputBytes, 0, targetValue, arrayTerminator, 1, enc, tz)
 
 	case reflect.Slice:
 		var targetInnerKind = reflect.ValueOf(targetValue).Kind()
@@ -45,7 +44,7 @@ func Unmarshal(inputBytes []byte, target interface{}, enc Encoding, tz Timezone,
 
 				var processedBytes, err = internalUnmarshal(inputBytes[currentByte:], 0, outputTarget.Elem(), arrayTerminator, 1, enc, tz)
 				if err != nil {
-					return err
+					return currentByte + processedBytes, err
 				}
 
 				currentByte += processedBytes
@@ -54,19 +53,19 @@ func Unmarshal(inputBytes []byte, target interface{}, enc Encoding, tz Timezone,
 				reflect.ValueOf(target).Elem().Set(targetValue)
 
 			default:
-				return newUnsupportedTypeError(targetValue.Type())
+				return 0, newUnsupportedTypeError(targetValue.Type())
 			}
 
 			// top-level arrays are always terminator types - advance through
 			currentByte, _ = advanceThroughTerminator(inputBytes, currentByte, arrayTerminator)
 
 			if currentByte >= len(inputBytes) {
-				return nil // the end (do not move this lower in code, as the boundary check has to be first)
+				return currentByte, nil // the end (do not move this lower in code, as the boundary check has to be first)
 			}
 		}
 
 	default:
-		return newUnsupportedTypeError(reflect.TypeOf(target))
+		return 0, newUnsupportedTypeError(reflect.TypeOf(target))
 	}
 
 }
@@ -224,6 +223,10 @@ func internalUnmarshal(inputBytes []byte, currentByte int, record reflect.Value,
 
 		currentByte, err = unmarshalSimpleTypes(inputBytes, currentByte, recordField, relativeAnnotatedLength, annotationList, depth+1, enc, tz)
 		if err != nil {
+			// the last item should actually return the error but itmes before should process to advance the current byte
+			if fieldNo < record.NumField()-1 && errors.Is(err, ErrorFoundZeroValueBytes) {
+				continue
+			}
 			return currentByte, newProcessingFieldError(record.Type().Field(fieldNo).Name, binTag, err)
 		}
 	}
