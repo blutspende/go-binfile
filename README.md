@@ -37,7 +37,7 @@ func main() {
     data := []byte("D 03116506 044760722905768E61     6.40  62      935  \r")
 	
     var result DataMessage
-	err := binfile.Unmarshal(data, &result, binfile.EncodingUTF8, binfile.TimezoneUTC, "\r")
+	position, err := binfile.Unmarshal(data, &result, binfile.EncodingUTF8, binfile.TimezoneUTC, "\r")
 
 	// 'data' is parsed into 'result'
 
