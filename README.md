@@ -32,23 +32,23 @@ type TestResultsStructure struct {
 }
 
 func main() {
-    ...
+	...
 
-    data := []byte("D 03116506 044760722905768E61     6.40  62      935  \r")
+	data := []byte("D 03116506 044760722905768E61     6.40  62      935  \r")
 	
-    var result DataMessage
+	var result DataMessage
 	position, err := binfile.Unmarshal(data, &result, binfile.EncodingUTF8, binfile.TimezoneUTC, "\r")
 
 	// 'data' is parsed into 'result'
 
-    ...
+	...
 }
 ```
 
 You can turn a filled annotated struct into a byte array.
 
 ```
-    ...
+	...
 
 	var inputData = DataMessage{
 		RecordType:          "D ",
@@ -75,9 +75,9 @@ You can turn a filled annotated struct into a byte array.
 
 	data, err := Marshal(inputData, ' ', binfile.EncodingUTF8, binfile.TimezoneUTC, "\r")
 
-    // 'data' is []byte("D 03116506 044760722905768E61     6.40  62      935  \r")
+	// 'data' is []byte("D 03116506 044760722905768E61     6.40  62      935  \r")
 
-    ...
+	...
 ```
 
 ## Annotation
