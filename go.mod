@@ -1,4 +1,4 @@
-module github.com/DRK-Blutspende-BaWueHe/go-binfile
+module github.com/blutspende/go-binfile
 
 go 1.18
 
